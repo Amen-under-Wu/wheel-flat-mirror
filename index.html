@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三十辐共一毂</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid #333;
+            background-color: white;
+        }
+        .info {
+            margin-top: 10px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fantasy Console Web示例</h1>
+    <canvas id="glCanvas" width="1200" height="680"></canvas>
+    <div class="info">
+        <p>整合了简单的图形和音频api的示例。</p>
+        <p>点击按钮播放一段方波，并以60fps刷新屏幕</p>
+    </div>
+    <button onclick="main()">点击开始</button>
+    
+    <script src="main.js"></script>
+</body>
+</html>
