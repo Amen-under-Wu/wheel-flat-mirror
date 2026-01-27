@@ -1,0 +1,102 @@
+use wasm_bindgen::prelude::*;
+
+mod io_device {
+    use web_sys::WebGl2RenderingContext as GL;
+    use wasm_bindgen::JsCast;
+    struct Screen {
+        gl: GL,
+        program: web_sys::WebGlProgram,
+        buffer: [f32; (Screen::WIDTH * Screen::HEIGHT) as usize],
+        canvas_width: f32,
+    }
+    impl Screen {
+        const WIDTH: u32 = 240 + 16;
+        const HEIGHT: u32 = 136 + 8;
+        const VERTEX_SHADER_SOURCE: &str = r#"
+attribute vec2 a_position;
+attribute vec3 a_color;
+
+// 传递给片元着色器的变量
+varying vec3 v_color;
+
+uniform float u_pixelSize;
+
+void main() {
+    gl_Position = vec4(a_position, 0.0, 1.0);
+    
+    gl_PointSize = u_pixelSize;
+    
+    v_color = a_color;
+}
+        "#;
+        const FRAGMENT_SHADER_SOURCE: &str = r#"
+precision mediump float;
+    
+varying vec3 v_color;
+
+void main() {
+    gl_FragColor = vec4(v_color, 1.0);
+}
+        "#;
+        fn new(gl: GL) -> Self {
+            let vertex_shader = Self::compile_shader(&gl, GL::VERTEX_SHADER, Self::VERTEX_SHADER_SOURCE);
+            let fragment_shader = Self::compile_shader(&gl, GL::FRAGMENT_SHADER, Self::FRAGMENT_SHADER_SOURCE);
+            let program = Self::create_program(&gl, &vertex_shader, &fragment_shader).unwrap();
+            let buffer = gl.create_buffer().unwrap();
+            gl.bind_buffer(GL::ARRAY_BUFFER, Some(&buffer));
+
+            let pos_attr_loc = gl.get_attrib_location(&program, "a_position") as u32;
+            let color_attr_loc = gl.get_attrib_location(&program, "a_color") as u32;
+            gl.enable_vertex_attrib_array(pos_attr_loc);
+            gl.enable_vertex_attrib_array(color_attr_loc);
+            let stride = 5 * 4;
+            gl.vertex_attrib_pointer_with_i32(pos_attr_loc, 2, GL::FLOAT, false, stride, 0);
+            gl.vertex_attrib_pointer_with_i32(color_attr_loc, 3, GL::FLOAT, false, stride, 2 * 4);
+            
+            let buffer = [0.0; (Self::WIDTH * Self::HEIGHT) as usize];
+
+            Self { 
+                gl,
+                program,
+                buffer,
+                canvas_width: 0.0,
+            }
+        }
+        fn compile_shader(gl: &GL, _type: u32, source: &str) -> web_sys::WebGlShader {
+            let shader = gl.create_shader(_type).expect("failed to create shader");
+            gl.shader_source(&shader, source);
+            gl.compile_shader(&shader);
+            shader
+        }
+        fn create_program(gl: &GL, vertex_shader: &web_sys::WebGlShader, fragment_shader: &web_sys::WebGlShader) -> Option<web_sys::WebGlProgram> {
+            let program = gl.create_program().expect("failed to create program");
+            gl.attach_shader(&program, vertex_shader);
+            gl.attach_shader(&program, fragment_shader);
+            gl.link_program(&program);
+            if !(gl.get_program_parameter(&program, GL::LINK_STATUS).as_bool().unwrap_or(false)) {
+                gl.delete_program(Some(&program));
+                None
+            } else {
+                Some(program)
+            }
+        }
+        pub fn adjust_size(&mut self, canvas_w: f32) {
+            let u_pix_size = self.gl.get_uniform_location(&self.program, "u_pixelSize").unwrap();
+            let pixel_size = canvas_w / Self::WIDTH as f32;
+            self.gl.uniform1f(Some(&u_pix_size), pixel_size);
+            let canvas_h = canvas_w as u32 * Self::HEIGHT / Self::WIDTH;
+            self.gl.viewport(0, 0, canvas_w as i32, canvas_h as i32);
+            self.canvas_width = canvas_w;
+        }
+        fn display(&self) {
+            let vertices_array = {
+                let memory_buffer = wasm_bindgen::memory()
+                    .dyn_into::<js_sys::WebAssembly::Memory>().unwrap()
+                    .buffer();
+                let location: u32 = self.buffer.as_ptr() as u32 / 4;
+                js_sys::Float32Array::new(&memory_buffer).subarray(location, location + self.buffer.len() as u32)
+            };
+            self.gl.draw_arrays(GL::POINTS, 0, (Self::WIDTH * Self::HEIGHT) as i32);
+        }
+    }
+}
