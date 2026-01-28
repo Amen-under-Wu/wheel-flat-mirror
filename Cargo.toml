@@ -19,8 +19,9 @@ version = "0.3.4"
 features = [
     "console",
     "Window",
+    "Document",
     "Performance",
-
+    "HtmlCanvasElement",
     "WebGl2RenderingContext",
     "WebGlProgram",
     "WebGlShader",

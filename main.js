@@ -1,8 +1,7 @@
 import init, {Wheel} from "./pkg/wheel_flat.js";
 
 init().then(() => {
-    const gl = document.getElementById("canvas").getContext("webgl2");
-    const wheel = Wheel.new(gl);
+    const wheel = Wheel.new();
     window.wheel_obj = wheel;
 })
 
@@ -54,6 +53,7 @@ async function playSquareWave() {
 }
 
 export function main() {
+    document.querySelector("button").remove();
     playSquareWave();
     start_loop(() => {window.wheel_obj.update();})
 }

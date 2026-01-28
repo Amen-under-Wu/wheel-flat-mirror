@@ -8,8 +8,8 @@ pub mod io_device {
         canvas_width: f32,
     }
     impl Screen {
-        const WIDTH: u32 = 240 + 16;
-        const HEIGHT: u32 = 136 + 8;
+        pub const WIDTH: u32 = (240 + 16) * 2;
+        pub const HEIGHT: u32 = (136 + 8) * 2;
         const VERTEX_SHADER_SOURCE: &str = r#"
 attribute vec2 a_position;
 attribute vec3 a_color;
@@ -100,10 +100,10 @@ void main() {
             self.gl.viewport(0, 0, canvas_w as i32, canvas_h as i32);
             self.canvas_width = canvas_w;
         }
-        pub fn update(&mut self) {
+        pub fn update(&mut self, buffer: &Vec<u8>) {
             for i in 0..(Self::WIDTH * Self::HEIGHT) as usize {
-                for j in 2..5 {
-                    self.buffer[i * 5 + j] = (self.buffer[i * 5 + j] + 0.1415926 * (i * j) as f32).rem_euclid(1.0);
+                for j in 0..3 {
+                    self.buffer[i * 5 + 2 + j] = buffer[i * 3 + j] as f32 / 255.0;
                 }
             }
         } 
@@ -122,6 +122,5 @@ void main() {
             );
             self.gl.draw_arrays(GL::POINTS, 0, (Self::WIDTH * Self::HEIGHT) as i32);
         }
-        
     }
 }
