@@ -1,12 +1,10 @@
-use wasm_bindgen::prelude::*;
-
-mod io_device {
+pub mod io_device {
     use web_sys::WebGl2RenderingContext as GL;
     use wasm_bindgen::JsCast;
-    struct Screen {
+    pub struct Screen {
         gl: GL,
         program: web_sys::WebGlProgram,
-        buffer: [f32; (Screen::WIDTH * Screen::HEIGHT) as usize],
+        buffer: Vec<f32>,
         canvas_width: f32,
     }
     impl Screen {
@@ -38,10 +36,12 @@ void main() {
     gl_FragColor = vec4(v_color, 1.0);
 }
         "#;
-        fn new(gl: GL) -> Self {
+        pub fn new(gl: GL) -> Self {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
             let vertex_shader = Self::compile_shader(&gl, GL::VERTEX_SHADER, Self::VERTEX_SHADER_SOURCE);
             let fragment_shader = Self::compile_shader(&gl, GL::FRAGMENT_SHADER, Self::FRAGMENT_SHADER_SOURCE);
             let program = Self::create_program(&gl, &vertex_shader, &fragment_shader).unwrap();
+            gl.use_program(Some(&program));
             let buffer = gl.create_buffer().unwrap();
             gl.bind_buffer(GL::ARRAY_BUFFER, Some(&buffer));
 
@@ -53,7 +53,19 @@ void main() {
             gl.vertex_attrib_pointer_with_i32(pos_attr_loc, 2, GL::FLOAT, false, stride, 0);
             gl.vertex_attrib_pointer_with_i32(color_attr_loc, 3, GL::FLOAT, false, stride, 2 * 4);
             
-            let buffer = [0.0; (Self::WIDTH * Self::HEIGHT) as usize];
+            let mut buffer = Vec::<f32>::new();
+            buffer.reserve((5 * Self::WIDTH * Self::HEIGHT) as usize);
+            for i in 0..Self::HEIGHT as usize {
+                for j in 0..Self::WIDTH as usize {
+                    //buffer[(i * Self::WIDTH as usize + j) * 5] = (j * 2 + 1) as f32 / Self::WIDTH as f32 - 1.0;
+                    //buffer[(i * Self::WIDTH as usize + j) * 5 + 1] = (i * 2 + 1) as f32 / Self::HEIGHT as f32 - 1.0;
+                    buffer.push((j * 2 + 1) as f32 / Self::WIDTH as f32 - 1.0);
+                    buffer.push((i * 2 + 1) as f32 / Self::HEIGHT as f32 - 1.0);
+                    buffer.push(0.0);
+                    buffer.push(0.0);
+                    buffer.push(0.0);
+                }
+            }
 
             Self { 
                 gl,
@@ -88,7 +100,14 @@ void main() {
             self.gl.viewport(0, 0, canvas_w as i32, canvas_h as i32);
             self.canvas_width = canvas_w;
         }
-        fn display(&self) {
+        pub fn update(&mut self) {
+            for i in 0..(Self::WIDTH * Self::HEIGHT) as usize {
+                for j in 2..5 {
+                    self.buffer[i * 5 + j] = (self.buffer[i * 5 + j] + 0.1415926 * (i * j) as f32).rem_euclid(1.0);
+                }
+            }
+        } 
+        pub fn display(&self) {
             let vertices_array = {
                 let memory_buffer = wasm_bindgen::memory()
                     .dyn_into::<js_sys::WebAssembly::Memory>().unwrap()
@@ -96,7 +115,13 @@ void main() {
                 let location: u32 = self.buffer.as_ptr() as u32 / 4;
                 js_sys::Float32Array::new(&memory_buffer).subarray(location, location + self.buffer.len() as u32)
             };
+            self.gl.buffer_data_with_array_buffer_view(
+                GL::ARRAY_BUFFER,
+                &vertices_array,
+                GL::STATIC_DRAW,
+            );
             self.gl.draw_arrays(GL::POINTS, 0, (Self::WIDTH * Self::HEIGHT) as i32);
         }
+        
     }
 }

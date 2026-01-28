@@ -22,13 +22,13 @@
 </head>
 <body>
     <h1>Fantasy Console Web示例</h1>
-    <canvas id="glCanvas" width="1200" height="680"></canvas>
+    <canvas id="canvas" width="1200" height="680"></canvas>
     <div class="info">
         <p>整合了简单的图形和音频api的示例。</p>
-        <p>点击按钮播放一段方波，并以60fps刷新屏幕</p>
+        <p>点击按钮开始播放动画，并播放一段方波。</p>
     </div>
-    <button onclick="main()">点击开始</button>
+    <button onclick="buttonCallback()">开始展示</button>
     
-    <script src="main.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>

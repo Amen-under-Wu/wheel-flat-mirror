@@ -1,38 +1,25 @@
 mod io_device;
+use crate::io_device::io_device as my_io;
+use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
 
+
 #[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
+pub struct Wheel {
+    screen: my_io::Screen
 }
 
-macro_rules! console_log {
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
-
-struct FpsCounter {
-    n: u32,
-    timer: f64,
-    performance: web_sys::Performance,
-}
-impl FpsCounter {
-    pub fn new() -> Self {
-        let window = web_sys::window().expect("should have a window in this context");
-        let performance = window.performance().expect("performance should be available");
+#[wasm_bindgen]
+impl Wheel {
+    pub fn new(gl: GL) -> Self {
+        let mut screen = my_io::Screen::new(gl);
+        screen.adjust_size(1200.0);
         Self {
-            n: 0,
-            timer: performance.now(),
-            performance
+            screen
         }
     }
-    pub fn tick(&mut self) {
-        let new_timer = self.performance.now();
-        if new_timer - self.timer > 1000.0 {
-            self.timer = new_timer;
-            console_log!("{}", self.n);
-            self.n = 0;
-        }
-        self.n += 1;
+    pub fn update(&mut self) {
+        self.screen.update();
+        self.screen.display();
     }
 }
