@@ -7,7 +7,7 @@ use rand::Rng;
 
 #[wasm_bindgen]
 pub struct Wheel {
-    screen: graphics_device::Screen,
+    screen: Box<dyn graphics_device::Display>,
     speaker: audio_device::Speaker,
     buffer: Vec<u8>,
     rng: rand::rngs::ThreadRng,
@@ -30,7 +30,7 @@ impl Wheel {
         screen.adjust_size(canvas.width() as f32);
 
         Self {
-            screen,
+            screen: Box::new(screen),
             speaker: audio_device::Speaker::new(audio_context),
             buffer: vec![0; (graphics_device::Screen::WIDTH * graphics_device::Screen::HEIGHT * 3) as usize],
             rng: rand::thread_rng(),
@@ -53,8 +53,7 @@ impl Wheel {
             self.buffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = g;
             self.buffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = b;
         }
-        self.screen.update(&self.buffer);
-        self.screen.display();
+        self.screen.display_screen(&self.buffer);
         if self.t % 60 == 0 {
             self.speaker.start();
         } else if self.t % 60 == 30 {

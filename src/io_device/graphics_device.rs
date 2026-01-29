@@ -122,3 +122,12 @@ gl_FragColor = vec4(v_color, 1.0);
         self.gl.draw_arrays(GL::POINTS, 0, (Self::WIDTH * Self::HEIGHT) as i32);
     }
 }
+pub trait Display {
+    fn display_screen(&mut self, screen_buffer: &Vec<u8>);
+}
+impl Display for Screen {
+    fn display_screen(&mut self, screen_buffer: &Vec<u8>) {
+        self.update(screen_buffer);
+        self.display();
+    }
+}
