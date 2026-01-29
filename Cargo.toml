@@ -27,4 +27,11 @@ features = [
     "WebGlShader",
     "WebGlBuffer",
     "WebGlUniformLocation",
+    "AudioContext",
+    "OscillatorNode",
+    "OscillatorType",
+    "AudioParam",
+    "PeriodicWave",
+    "AudioNode",
+    "AudioDestinationNode",
 ]
