@@ -1,9 +1,6 @@
 import init, {Wheel} from "./pkg/wheel_flat.js";
 
 init().then(() => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const wheel = Wheel.new(audioContext);
-    window.wheel_obj = wheel;
 })
 
 let fps_timer = performance.now();
@@ -56,6 +53,9 @@ async function playSquareWave() {
 export function main() {
     document.querySelector("button").remove();
     //playSquareWave();
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const wheel = Wheel.new(audioContext);
+    window.wheel_obj = wheel;
     start_loop(() => {window.wheel_obj.update();})
 }
 
