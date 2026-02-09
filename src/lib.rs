@@ -33,8 +33,12 @@ impl Wheel {
         let mut screen = graphics_device::Screen::new(gl);
         screen.adjust_size(canvas.width() as f32);
 
+        let rect = canvas.get_bounding_client_rect();
+
         let ibuffer = input_device::InputDevice::new_refcell();
         input_device::InputDevice::link(&ibuffer, &canvas.dyn_into::<web_sys::EventTarget>().unwrap());
+        ibuffer.borrow_mut().set_rect(rect.x() as i32, rect.y() as i32, rect.width() as i32, rect.height() as i32,
+            graphics_device::Screen::WIDTH as i32, graphics_device::Screen::HEIGHT as i32);
 
         Self {
             screen: Box::new(screen),
@@ -49,18 +53,31 @@ impl Wheel {
     pub fn update(&mut self) {
         let x = self.ibuffer.borrow().mouse.x as usize % graphics_device::Screen::WIDTH as usize;
         let y = self.ibuffer.borrow().mouse.y as usize % graphics_device::Screen::HEIGHT as usize;
-        let r = self.rng.r#gen::<u8>();
-        let g = self.rng.r#gen::<u8>();
-        let b = self.rng.r#gen::<u8>();
-        for i in 0..graphics_device::Screen::WIDTH as usize {
-            self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3] = r;
-            self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 1] = g;
-            self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 2] = b;
-        }
-        for i in 0..graphics_device::Screen::HEIGHT as usize {
-            self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3] = r;
-            self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = g;
-            self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = b;
+        if self.ibuffer.borrow().mouse.left {
+            let r = self.rng.r#gen::<u8>();
+            let g = self.rng.r#gen::<u8>();
+            let b = self.rng.r#gen::<u8>();
+            for i in 0..graphics_device::Screen::WIDTH as usize {
+                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3] = r;
+                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 1] = g;
+                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 2] = b;
+            }
+            for i in 0..graphics_device::Screen::HEIGHT as usize {
+                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3] = r;
+                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = g;
+                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = b;
+            }
+        } else if self.ibuffer.borrow().mouse.right {
+            for i in 0..graphics_device::Screen::WIDTH as usize {
+                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3] = 0;
+                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 1] = 0;
+                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 2] = 0;
+            }
+            for i in 0..graphics_device::Screen::HEIGHT as usize {
+                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3] = 0;
+                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = 0;
+                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = 0;
+            }
         }
         self.screen.display_screen(&self.vbuffer);
         self.abuffer[0].volumn = 15;
@@ -71,7 +88,7 @@ impl Wheel {
         if self.t % 60 == 0 {
             web_sys::console::log_1(
                 &format!(
-                    "Button clicked at x: {}, y: {}",
+                    "mouse at x: {}, y: {}",
                     self.ibuffer.borrow().mouse.x,
                     self.ibuffer.borrow().mouse.y,
                 )
@@ -81,7 +98,7 @@ impl Wheel {
         } else if self.t % 60 == 30 {
             //self.abuffer[0].freq = 660;
         }
-        self.speaker.set_registers(&self.abuffer);
+        //self.speaker.set_registers(&self.abuffer);
         self.t += 1;
     }
 }
