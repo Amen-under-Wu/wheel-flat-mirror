@@ -6,7 +6,7 @@ struct Channel {
 impl Channel {
     const BIT_DEPTH: f32 = 15.0;
     const WAVEFORM_LENGTH: usize = 32;
-    const UPSAMPLE_RATE: usize = 2;
+    const UPSAMPLE_RATE: usize = 4;
 
     fn new(context: &web_sys::AudioContext, constraints: &web_sys::PeriodicWaveConstraints) -> Self {
         let mut res = Self {
@@ -30,7 +30,7 @@ impl Channel {
             }
         }
         
-        for i in 0..Self::WAVEFORM_LENGTH {
+        for i in 1..Self::WAVEFORM_LENGTH {
             self.waveform_raw.0[i] = waveform_complex[i].re;
             self.waveform_raw.1[i] = waveform_complex[i].im;
         }
@@ -45,6 +45,23 @@ impl Channel {
     fn load_waveform(&mut self, context: &web_sys::AudioContext, constraints: &web_sys::PeriodicWaveConstraints) {
         let wave = context.create_periodic_wave_with_constraints(&mut self.waveform_raw.0, &mut self.waveform_raw.1, constraints).unwrap();
         self.oscillator.set_periodic_wave(&wave);
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct WheelSoundRegister {
+    pub waveform: [u8; Channel::WAVEFORM_LENGTH],
+    pub volumn: u8,
+    pub freq: u16,
+}
+
+impl WheelSoundRegister {
+    pub fn new() -> Self {
+        Self {
+            waveform: [0; Channel::WAVEFORM_LENGTH],
+            volumn: 0,
+            freq: 0,
+        }
     }
 }
 
@@ -69,22 +86,18 @@ impl Speaker {
             channels
         }
     }
-    pub fn start(&mut self) {
-        let mut square = [0; Channel::WAVEFORM_LENGTH];
-        for i in 0..Channel::WAVEFORM_LENGTH {
-            square[i] = if i < Channel::WAVEFORM_LENGTH / 2 {15} else {0};
+}
+
+pub trait PlayRegister {
+    fn set_registers(&mut self, reg: &[WheelSoundRegister]);
+}
+
+impl PlayRegister for Speaker {
+    fn set_registers(&mut self, reg: &[WheelSoundRegister]) {
+        for i in 0..Self::CHANNEL_N {
+            self.channels[i].set_waveform(reg[i].waveform, reg[i].volumn);
+            self.channels[i].set_freq(32.0 * reg[i].freq as f32);
+            self.channels[i].load_waveform(&self.context, &self.constraint);
         }
-        self.channels[0].set_waveform(square, 15);
-        self.channels[0].load_waveform(&self.context, &self.constraint);
-    }
-    pub fn stop(&mut self) {
-        let mut square = [0; Channel::WAVEFORM_LENGTH];
-        for i in 0..Channel::WAVEFORM_LENGTH {
-            square[i] = if i < Channel::WAVEFORM_LENGTH / 2 {15} else {0};
-        }
-        self.channels[0].set_waveform(square, 0);
-        //self.channels[0].set_waveform(Self::SQUARE.clone(), 0);
-        //self.channels[0].waveform_raw.0[1] = 0.0;
-        self.channels[0].load_waveform(&self.context, &self.constraint);
     }
 }
