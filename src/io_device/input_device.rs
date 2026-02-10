@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::HashSet;
 
 pub struct MouseData {
     pub left: bool,
@@ -43,20 +44,22 @@ impl ScreenRect {
 }
 
 pub struct InputDevice {
-    pub key_buffer: [u8; Self::KEY_BUFFER_SIZE],
+    pub key_buffer: HashSet<String>,
     pub mouse: MouseData,
     pub screen_rect: ScreenRect,
 }
 
 impl InputDevice {
-    const KEY_BUFFER_SIZE: usize = 4;
     pub fn new() -> Self {
         let res = Self {
-            key_buffer: [0; Self::KEY_BUFFER_SIZE],
+            key_buffer: HashSet::new(),
             mouse: MouseData::new(),
             screen_rect: ScreenRect::new(0, 0, 0, 0, 0, 0),
         };
         res
+    }
+    fn key_code(key: String) -> u8 {
+        0
     }
     pub fn new_refcell() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self::new()))
@@ -84,7 +87,6 @@ impl InputDevice {
                 2 => {inner.mouse.right = true;}
                 _ => ()
             }
-            event.prevent_default();
         }) as Box<dyn FnMut(_)>);
         target.add_event_listener_with_callback(
             "mousedown",
@@ -110,6 +112,31 @@ impl InputDevice {
         closure_mouseup.forget();
 
         let self_clone = Rc::clone(_self);
+        let closure_keydown = wasm_bindgen::closure::Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
+            let mut inner = self_clone.borrow_mut();
+            if !event.is_composing() {
+                event.prevent_default();
+                inner.key_buffer.insert(event.key());
+            }
+        }) as Box<dyn FnMut(_)>);
+        target.add_event_listener_with_callback(
+            "keydown",
+            closure_keydown.as_ref().unchecked_ref()
+        ).unwrap();
+        closure_keydown.forget();
+
+        let self_clone = Rc::clone(_self);
+        let closure_keyup = wasm_bindgen::closure::Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
+            let mut inner = self_clone.borrow_mut();
+            event.prevent_default();
+            inner.key_buffer.remove(&event.key());
+        }) as Box<dyn FnMut(_)>);
+        target.add_event_listener_with_callback(
+            "keyup",
+            closure_keyup.as_ref().unchecked_ref()
+        ).unwrap();
+        closure_keyup.forget();
+
         let closure_contextmenu = wasm_bindgen::closure::Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
             // Only prevent default if it's a right click (button 2)
             if event.button() == 2 {

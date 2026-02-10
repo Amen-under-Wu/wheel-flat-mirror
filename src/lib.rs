@@ -82,8 +82,8 @@ impl Wheel {
         self.screen.display_screen(&self.vbuffer);
         self.abuffer[0].volumn = 15;
         self.abuffer[0].freq = 440;
-        for i in 0..32 {
-            //self.abuffer[0].waveform[i] = if i < 16 {0} else {15};
+        /*for i in 0..32 {
+            self.abuffer[0].waveform[i] = if i < 16 {0} else {15};
         }
         if self.t % 60 == 0 {
             web_sys::console::log_1(
@@ -97,8 +97,11 @@ impl Wheel {
             //self.abuffer[0].freq = 440;
         } else if self.t % 60 == 30 {
             //self.abuffer[0].freq = 660;
+        }*/
+        if !self.ibuffer.borrow().key_buffer.is_empty() {
+            web_sys::console::log_1(&format!("{:?}", self.ibuffer.borrow().key_buffer).into());
         }
-        //self.speaker.set_registers(&self.abuffer);
+        self.speaker.set_registers(&self.abuffer);
         self.t += 1;
     }
 }

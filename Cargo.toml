@@ -41,4 +41,5 @@ features = [
     "MouseEvent",
     "DomRect",
     "Element",
+    "KeyboardEvent",
 ]
