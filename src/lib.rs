@@ -13,7 +13,7 @@ pub struct Wheel {
     speaker: Box<dyn audio_device::PlayRegister>,
     vbuffer: Vec<u8>,
     abuffer: [audio_device::WheelSoundRegister; 4],
-    ibuffer: Rc<RefCell<input_device::InputDevice>>,
+    ibuffer: Box<dyn input_device::GetInput>,
     rng: rand::rngs::ThreadRng,
     t: i32
 }
@@ -45,15 +45,16 @@ impl Wheel {
             speaker: Box::new(audio_device::Speaker::new(audio_context)),
             vbuffer: vec![0; (graphics_device::Screen::WIDTH * graphics_device::Screen::HEIGHT * 3) as usize],
             abuffer: [audio_device::WheelSoundRegister::new(); 4],
-            ibuffer,
+            ibuffer: Box::new(ibuffer),
             rng: rand::thread_rng(),
             t: 0
         }
     }
     pub fn update(&mut self) {
-        let x = self.ibuffer.borrow().mouse.x as usize % graphics_device::Screen::WIDTH as usize;
-        let y = self.ibuffer.borrow().mouse.y as usize % graphics_device::Screen::HEIGHT as usize;
-        if self.ibuffer.borrow().mouse.left {
+        let ibuffer = self.ibuffer.get_input();
+        let x = ibuffer.mouse.x as usize % graphics_device::Screen::WIDTH as usize;
+        let y = ibuffer.mouse.y as usize % graphics_device::Screen::HEIGHT as usize;
+        if ibuffer.mouse.left {
             let r = self.rng.r#gen::<u8>();
             let g = self.rng.r#gen::<u8>();
             let b = self.rng.r#gen::<u8>();
@@ -67,7 +68,7 @@ impl Wheel {
                 self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = g;
                 self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = b;
             }
-        } else if self.ibuffer.borrow().mouse.right {
+        } else if ibuffer.mouse.right {
             for i in 0..graphics_device::Screen::WIDTH as usize {
                 self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3] = 0;
                 self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 1] = 0;
@@ -98,9 +99,7 @@ impl Wheel {
         } else if self.t % 60 == 30 {
             //self.abuffer[0].freq = 660;
         }*/
-        if !self.ibuffer.borrow().key_buffer.is_empty() {
-            web_sys::console::log_1(&format!("{:?}", self.ibuffer.borrow().key_buffer).into());
-        }
+        web_sys::console::log_1(&format!("{:?}, {:?}", ibuffer.key, ibuffer.mouse).into());
         self.speaker.set_registers(&self.abuffer);
         self.t += 1;
     }
