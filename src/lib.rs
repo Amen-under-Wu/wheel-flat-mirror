@@ -3,9 +3,6 @@ use crate::io_device::{graphics_device, audio_device, input_device};
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
 use rand::Rng;
-use std::rc::Rc;
-use std::cell::RefCell;
-
 
 #[wasm_bindgen]
 pub struct Wheel {
@@ -83,23 +80,16 @@ impl Wheel {
         self.screen.display_screen(&self.vbuffer);
         self.abuffer[0].volumn = 15;
         self.abuffer[0].freq = 440;
-        /*for i in 0..32 {
-            self.abuffer[0].waveform[i] = if i < 16 {0} else {15};
-        }
         if self.t % 60 == 0 {
-            web_sys::console::log_1(
-                &format!(
-                    "mouse at x: {}, y: {}",
-                    self.ibuffer.borrow().mouse.x,
-                    self.ibuffer.borrow().mouse.y,
-                )
-                .into(),
-            );
-            //self.abuffer[0].freq = 440;
+            for i in 0..32 {
+                self.abuffer[0].waveform[i] = if i < 16 {0} else {15};
+            }
         } else if self.t % 60 == 30 {
-            //self.abuffer[0].freq = 660;
-        }*/
-        web_sys::console::log_1(&format!("{:?}, {:?}", ibuffer.key, ibuffer.mouse).into());
+            for i in 0..32 {
+                self.abuffer[0].waveform[i] = i as u8 / 2;
+            }
+        }
+        //web_sys::console::log_1(&format!("{:?}, {:?}", ibuffer.key, ibuffer.mouse).into());
         self.speaker.set_registers(&self.abuffer);
         self.t += 1;
     }
