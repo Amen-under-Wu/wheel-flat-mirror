@@ -4,20 +4,16 @@ use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
 use rand::Rng;
 
-#[wasm_bindgen]
-pub struct Wheel {
+struct WheelContext {
     screen: Box<dyn graphics_device::Display>,
     speaker: Box<dyn audio_device::PlayRegister>,
     vbuffer: Vec<u8>,
     abuffer: [audio_device::WheelSoundRegister; 4],
     ibuffer: Box<dyn input_device::GetInput>,
-    rng: rand::rngs::ThreadRng,
-    t: i32
 }
 
-#[wasm_bindgen]
-impl Wheel {
-    pub fn new(audio_context: web_sys::AudioContext) -> Self {
+impl WheelContext {
+    fn new(audio_context: web_sys::AudioContext) -> Self {
         let window = web_sys::window().expect("no global window exists");
         let document = window.document().expect("no document on window");
         let canvas = document
@@ -43,54 +39,140 @@ impl Wheel {
             vbuffer: vec![0; (graphics_device::Screen::WIDTH * graphics_device::Screen::HEIGHT * 3) as usize],
             abuffer: [audio_device::WheelSoundRegister::new(); 4],
             ibuffer: Box::new(ibuffer),
+        }
+    }
+    fn update(&mut self) {
+        self.screen.display_screen(&self.vbuffer);
+        self.speaker.set_registers(&self.abuffer);
+    }
+    fn in_screen(x: i32, y: i32) -> bool {
+        x >= 0 && y >= 0 && (x as u32) < graphics_device::Screen::WIDTH && (y as u32) < graphics_device::Screen::HEIGHT
+    }
+}
+
+pub trait WheelInterface {
+    fn draw_pixel(&mut self, x: i32, y: i32, color: u32);
+    fn draw_while(&mut self, from: i32, to: i32, color: u32, coord: &dyn Fn(i32) -> (i32, i32));
+    fn play(&mut self, channel: usize, waveform: [u8; 32], volumn: u8, freq: u16);
+    fn get_buttons(&self) -> [u8; 4];
+    fn get_keys(&self) -> [u8; 4];
+    fn get_mouse(&self) -> input_device::MouseData;
+}
+
+impl WheelInterface for WheelContext {
+    fn draw_pixel(&mut self, x: i32, y: i32, color: u32) {
+        if Self::in_screen(x, y) {
+            let idx: usize = (y as u32 * graphics_device::Screen::WIDTH + x as u32) as usize * 3;
+            self.vbuffer[idx] = ((color >> 16) & 0xff) as u8;
+            self.vbuffer[idx + 1] = ((color >> 8) & 0xff) as u8;
+            self.vbuffer[idx + 2] = (color & 0xff) as u8;
+        }
+    }
+    fn draw_while(&mut self, from: i32, to: i32, color: u32, coord: &dyn Fn(i32) -> (i32, i32)) {
+        for i in from..to {
+            let (x, y) = coord(i);
+            if !Self::in_screen(x, y) {
+                break;
+            }
+            let idx: usize = (y as u32 * graphics_device::Screen::WIDTH + x as u32) as usize * 3;
+            self.vbuffer[idx] = ((color >> 16) & 0xff) as u8;
+            self.vbuffer[idx + 1] = ((color >> 8) & 0xff) as u8;
+            self.vbuffer[idx + 2] = (color & 0xff) as u8;
+        }
+    }
+    fn play(&mut self, channel: usize, waveform: [u8; 32], volumn: u8, freq: u16) {
+        if channel < 4 {
+            self.abuffer[channel].waveform = waveform;
+            self.abuffer[channel].volumn = volumn;
+            self.abuffer[channel].freq = freq;
+        }
+    }
+    fn get_buttons(&self) -> [u8; 4] {
+        self.ibuffer.get_input().gamepad
+    }
+    fn get_keys(&self) -> [u8; 4] {
+        self.ibuffer.get_input().key
+    }
+    fn get_mouse(&self) -> input_device::MouseData {
+        self.ibuffer.get_input().mouse
+    }
+}
+
+struct Program {
+    rng: rand::rngs::ThreadRng,
+    t: u32,
+}
+
+impl Program {
+    fn new() -> Self {
+        Self {
             rng: rand::thread_rng(),
             t: 0
         }
     }
-    pub fn update(&mut self) {
-        let ibuffer = self.ibuffer.get_input();
-        let x = ibuffer.mouse.x as usize % graphics_device::Screen::WIDTH as usize;
-        let y = ibuffer.mouse.y as usize % graphics_device::Screen::HEIGHT as usize;
-        if ibuffer.mouse.left {
-            let r = self.rng.r#gen::<u8>();
-            let g = self.rng.r#gen::<u8>();
-            let b = self.rng.r#gen::<u8>();
-            for i in 0..graphics_device::Screen::WIDTH as usize {
-                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3] = r;
-                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 1] = g;
-                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 2] = b;
-            }
-            for i in 0..graphics_device::Screen::HEIGHT as usize {
-                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3] = r;
-                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = g;
-                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = b;
-            }
-        } else if ibuffer.mouse.right {
-            for i in 0..graphics_device::Screen::WIDTH as usize {
-                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3] = 0;
-                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 1] = 0;
-                self.vbuffer[(y * graphics_device::Screen::WIDTH as usize + i) * 3 + 2] = 0;
-            }
-            for i in 0..graphics_device::Screen::HEIGHT as usize {
-                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3] = 0;
-                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 1] = 0;
-                self.vbuffer[(i * graphics_device::Screen::WIDTH as usize + x) * 3 + 2] = 0;
+    fn init(&mut self, wheel: &mut dyn WheelInterface) {
+        for i in 0..graphics_device::Screen::WIDTH as i32 {
+            for j in 0..graphics_device::Screen::HEIGHT as i32 {
+                wheel.draw_pixel(i, j, 0xffffff);
             }
         }
-        self.screen.display_screen(&self.vbuffer);
-        self.abuffer[0].volumn = 15;
-        self.abuffer[0].freq = 440;
+    }
+    fn update(&mut self, wheel: &mut dyn WheelInterface) {
+        let mouse = wheel.get_mouse();
+        let x = mouse.x;
+        let y = mouse.y;
+        if mouse.left {
+            let rgb = self.rng.r#gen::<u32>();
+            for i in 0..graphics_device::Screen::WIDTH as i32 {
+                wheel.draw_pixel(i, y, rgb);
+            }
+            for i in 0..graphics_device::Screen::HEIGHT as i32 {
+                wheel.draw_pixel(x, i, rgb);
+            }
+        } else if mouse.right {
+            for i in 0..graphics_device::Screen::WIDTH as i32 {
+                wheel.draw_pixel(i, y, 0xffffff);
+            }
+            for i in 0..graphics_device::Screen::HEIGHT as i32 {
+                wheel.draw_pixel(x, i, 0xffffff);
+            }
+        }
+        let volumn = 15;
+        let freq = 440;
+        let mut waveform = [0; 32];
         if self.t % 60 == 0 {
             for i in 0..32 {
-                self.abuffer[0].waveform[i] = if i < 16 {0} else {15};
+                waveform[i] = if i < 16 {0} else {15};
             }
         } else if self.t % 60 == 30 {
             for i in 0..32 {
-                self.abuffer[0].waveform[i] = i as u8 / 2;
+                waveform[i] = i as u8 / 2;
             }
         }
-        //web_sys::console::log_1(&format!("{:?}, {:?}", ibuffer.key, ibuffer.mouse).into());
-        self.speaker.set_registers(&self.abuffer);
+        wheel.play(0, waveform, volumn, freq);
         self.t += 1;
+    }
+}
+
+#[wasm_bindgen]
+struct Wheel {
+    context: WheelContext,
+    program: Program,
+}
+
+#[wasm_bindgen]
+impl Wheel {
+    pub fn new(audio_context: web_sys::AudioContext) -> Self {
+        let mut context = WheelContext::new(audio_context);
+        let mut program = Program::new();
+        program.init(&mut context);
+        Self {
+            context,
+            program,
+        }
+    }
+    pub fn update(&mut self) {
+        self.program.update(&mut self.context);
+        self.context.update();
     }
 }
