@@ -1,4 +1,5 @@
 mod io_device;
+mod cartridge;
 use crate::io_device::{graphics_device, audio_device, input_device};
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
