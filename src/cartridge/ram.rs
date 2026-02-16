@@ -6,7 +6,7 @@ pub struct Vram {
 
 impl Vram {
     pub const SIZE: usize = 16384;
-    const VBANK_N: usize = 2;
+    pub const VBANK_N: usize = 2;
     pub const SCREEN_WIDTH: usize = 240;
     pub const SCREEN_HEIGHT: usize = 136;
     const BPP: usize = 4; // bits per pixel
@@ -99,7 +99,9 @@ impl Ram {
     pub const STEREO_VOLUME_OFFSET: usize = Self::SOUND_STATE_OFFSET + Self::SOUND_STATE_BYTE_SIZE;
     const STEREO_VOLUME_BYTE_SIZE: usize = 4;
     pub const PERSISTENT_MEMORY_OFFSET: usize = Self::STEREO_VOLUME_OFFSET + Self::STEREO_VOLUME_BYTE_SIZE;
-    const PERSISTENT_MEMORY_BYTE_SIZE: usize = 1024;
+    pub const PERSISTENT_MEMORY_SIZE: usize = 256;
+    const BYTE_PER_PMEM: usize = 4;
+    pub const PERSISTENT_MEMORY_BYTE_SIZE: usize = Self::PERSISTENT_MEMORY_SIZE * Self::BYTE_PER_PMEM;
     pub const SPRITE_FLAGS_OFFSET: usize = Self::PERSISTENT_MEMORY_OFFSET + Self::PERSISTENT_MEMORY_BYTE_SIZE;
     const SPRITE_FLAGS_BYTE_SIZE: usize = Self::TILES_N + Self::SPRITES_N;
     pub const SYSTEM_FONT_OFFSET: usize = Self::SPRITE_FLAGS_OFFSET + Self::SPRITE_FLAGS_BYTE_SIZE;
@@ -112,6 +114,9 @@ impl Ram {
             vram: Vram::new(),
             ram: [0; Self::SIZE - Vram::SIZE],
         }
+    }
+    pub fn set_active_vbank(&mut self, id: usize) {
+        self.vram.set_active_bank(id);
     }
 }
 

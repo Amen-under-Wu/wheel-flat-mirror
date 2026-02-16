@@ -61,6 +61,12 @@ impl CartContext {
     pub fn poke1(&mut self, addr: usize, val: u8) {
         self.poke_with_bits(addr, val, 1);
     }
+    
+    pub fn vbank(&mut self, id: usize) {
+        if id < Vram::VBANK_N {
+            self.ram[self.active_bank].set_active_vbank(id);
+        }
+    }
 
     fn draw_while(&mut self, from: i32, to: i32, color: u32, coord: &dyn Fn(i32) -> (i32, i32)) {
     }
