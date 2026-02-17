@@ -1,12 +1,13 @@
 pub mod ram;
 use crate::cartridge::ram::{Vram, Ram};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 struct CartContext {
     ram: Vec<Ram>,
     active_bank: usize,
     clip_rect: (i32, i32, i32, i32),
     trans_map: HashSet<(i32, i32)>,
+    key_timer: HashMap<u8, u32>,
 }
 
 impl CartContext {
@@ -17,6 +18,7 @@ impl CartContext {
             active_bank: 0,
             clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
             trans_map: HashSet::new(),
+            key_timer: HashMap::new(),
         }
     }
 
@@ -200,7 +202,43 @@ impl crate::WheelProgram for Cartridge {
         self.program.init(&mut self.context);
     }
     fn update(&mut self, wheel: &mut dyn crate::WheelInterface) {
-        // todo: get input
+        // get input
+        let btns = wheel.get_buttons();
+        let keys = wheel.get_keys();
+        for i in 0..4 {
+            self.context.poke(Ram::GAMEPADS_OFFSET, btns[i]);
+            self.context.poke(Ram::KEYBOARD_OFFSET, keys[i]);
+        }
+        let mut gamepad_map = 0;
+        for i in 0..8 {
+            if keys.contains(&self.context.peek(Ram::GAMEPAD_MAPPING_OFFSET + i)) {
+                gamepad_map |= 1 << i;
+            }
+        }
+        self.context.poke(Ram::GAMEPADS_OFFSET, gamepad_map);
+        let mouse = wheel.get_mouse();
+        let mouse_x = 
+            if mouse.x > 0 && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32 {
+                mouse.x / 2 - Self::BORDER_W as i32
+            } else {
+                -1
+            };
+        let mouse_y = 
+            if mouse.y > 0 && mouse.y <= 2 * (Vram::SCREEN_HEIGHT + 2 * Self::BORDER_H) as i32 {
+                mouse.y / 2 - Self::BORDER_H as i32
+            } else {
+                -1
+            };
+        self.context.poke(Ram::MOUSE_OFFSET, mouse_x as u8);
+        self.context.poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
+        const SCROLL_FACTOR: i32 = 50;
+        let mut mouse_lw: u16 = mouse.left as u16 | ((mouse.middle as u16) << 1) | ((mouse.right as u16) << 2);
+        let scroll_x = mouse.scroll_x / SCROLL_FACTOR;
+        let scroll_y = mouse.scroll_y / SCROLL_FACTOR;
+        mouse_lw |= ((scroll_x & 0b111111) as u16) << 3;
+        mouse_lw |= ((scroll_y & 0b111111) as u16) << 9;
+        self.context.poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
+        self.context.poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
 
         self.program.update(&mut self.context);
 
