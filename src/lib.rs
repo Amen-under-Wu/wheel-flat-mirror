@@ -53,7 +53,7 @@ impl WheelContext {
 
 pub trait WheelInterface {
     fn draw_pixel(&mut self, x: i32, y: i32, color: u32);
-    fn draw_while(&mut self, from: i32, to: i32, color: u32, coord: &dyn Fn(i32) -> (i32, i32));
+    fn draw_pixel_unsafe(&mut self, x: i32, y: i32, color: u32);
     fn play(&mut self, channel: usize, waveform: [u8; 32], volumn: u8, freq: u16);
     fn get_buttons(&self) -> [u8; 4];
     fn get_keys(&self) -> [u8; 4];
@@ -69,17 +69,11 @@ impl WheelInterface for WheelContext {
             self.vbuffer[idx + 2] = (color & 0xff) as u8;
         }
     }
-    fn draw_while(&mut self, from: i32, to: i32, color: u32, coord: &dyn Fn(i32) -> (i32, i32)) {
-        for i in from..to {
-            let (x, y) = coord(i);
-            if !Self::in_screen(x, y) {
-                break;
-            }
-            let idx: usize = (y as u32 * graphics_device::Screen::WIDTH + x as u32) as usize * 3;
-            self.vbuffer[idx] = ((color >> 16) & 0xff) as u8;
-            self.vbuffer[idx + 1] = ((color >> 8) & 0xff) as u8;
-            self.vbuffer[idx + 2] = (color & 0xff) as u8;
-        }
+    fn draw_pixel_unsafe(&mut self, x: i32, y: i32, color: u32) {
+        let idx: usize = (y as u32 * graphics_device::Screen::WIDTH + x as u32) as usize * 3;
+        self.vbuffer[idx] = ((color >> 16) & 0xff) as u8;
+        self.vbuffer[idx + 1] = ((color >> 8) & 0xff) as u8;
+        self.vbuffer[idx + 2] = (color & 0xff) as u8;
     }
     fn play(&mut self, channel: usize, waveform: [u8; 32], volumn: u8, freq: u16) {
         if channel < 4 {
@@ -99,6 +93,11 @@ impl WheelInterface for WheelContext {
     }
 }
 
+pub trait WheelProgram {
+    fn init(&mut self, wheel: &mut dyn WheelInterface) {}
+    fn update(&mut self, wheel: &mut dyn WheelInterface) {}
+}
+
 struct Program {
     rng: rand::rngs::ThreadRng,
     t: u32,
@@ -111,6 +110,9 @@ impl Program {
             t: 0
         }
     }
+}
+
+impl WheelProgram for Program {
     fn init(&mut self, wheel: &mut dyn WheelInterface) {
         for i in 0..graphics_device::Screen::WIDTH as i32 {
             for j in 0..graphics_device::Screen::HEIGHT as i32 {

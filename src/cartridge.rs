@@ -1,10 +1,12 @@
 pub mod ram;
 use crate::cartridge::ram::{Vram, Ram};
+use std::collections::HashSet;
 
 struct CartContext {
     ram: Vec<Ram>,
     active_bank: usize,
     clip_rect: (i32, i32, i32, i32),
+    trans_map: HashSet<(i32, i32)>,
 }
 
 impl CartContext {
@@ -14,6 +16,7 @@ impl CartContext {
             ram: vec![Ram::new(); Self::BANK_N],
             active_bank: 0,
             clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
+            trans_map: HashSet::new(),
         }
     }
 
@@ -162,17 +165,104 @@ pub trait CartProgram {
     fn overlay(&mut self, context: &mut CartContext) {}
 }
 
-struct Cartridge {
+pub struct Cartridge {
     context: CartContext,
     program: Box<dyn CartProgram>,
 }
 
 impl Cartridge {
+    const BORDER_W: usize = 8;
+    const BORDER_H: usize = 4;
     pub fn new(program: Box<dyn CartProgram>) -> Self {
         Self {
             context: CartContext::new(),
             program
         }
+    }
+    fn get_color(&self, color: u8) -> u32 {
+        let true_index = self.context.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize) as usize;
+        let r = self.context.peek(Vram::PALETTE_OFFSET + true_index * 3) as u32;
+        let g = self.context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 1) as u32;
+        let b = self.context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 2) as u32;
+        (r << 16) | (g << 8) | b
+    }
+}
+
+fn draw_fat_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, color: u32) {
+    wheel.draw_pixel(x * 2, y * 2, color);
+    wheel.draw_pixel(x * 2 + 1, y * 2, color);
+    wheel.draw_pixel(x * 2, y * 2 + 1, color);
+    wheel.draw_pixel(x * 2 + 1, y * 2 + 1, color);
+}
+
+impl crate::WheelProgram for Cartridge {
+    fn init(&mut self, wheel: &mut dyn crate::WheelInterface) {
+        self.program.init(&mut self.context);
+    }
+    fn update(&mut self, wheel: &mut dyn crate::WheelInterface) {
+        // todo: get input
+
+        self.program.update(&mut self.context);
+
+        // draw screen
+        self.context.ram[self.context.active_bank].set_active_vbank(1);
+        self.program.overlay(&mut self.context);
+        self.context.trans_map.clear();
+        let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
+        let trans_color = self.context.peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
+        let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
+        let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
+        for i in 0..Vram::SCREEN_HEIGHT{
+            let y = (i + Self::BORDER_H) as i32 + y_offset;
+            for xx in 0..Vram::SCREEN_WIDTH {
+                let color_id = self.context.peek4(i * Vram::SCREEN_WIDTH + xx);
+                if color_id != trans_color {
+                    let color = palette[color_id as usize];
+                    let x = (xx + Self::BORDER_W) as i32 + x_offset;
+                    draw_fat_pixel(wheel, x, y, color);
+                    self.context.trans_map.insert((xx as i32, i as i32));
+                }
+            }
+        }
+
+        self.context.ram[self.context.active_bank].set_active_vbank(0);
+        for i in 0..Self::BORDER_H {
+            self.program.scanline(&mut self.context, i);
+            let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
+            for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
+                draw_fat_pixel(wheel, x, i as i32, color);
+            }
+        }
+        for i in 0..Vram::SCREEN_HEIGHT {
+            self.program.scanline(&mut self.context, i + Self::BORDER_H);
+            let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
+            let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
+            let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
+            let y = (i + Self::BORDER_H) as i32 + y_offset;
+            for xx in 0..Vram::SCREEN_WIDTH {
+                let color = palette[self.context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
+                let x = (xx + Self::BORDER_W) as i32 + x_offset;
+                if !self.context.trans_map.contains(&(xx as i32, i as i32)) {
+                    draw_fat_pixel(wheel, x, y, color);
+                }
+            }
+            let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
+            for x in 0..Self::BORDER_W as i32 {
+                draw_fat_pixel(wheel, x, y, color);
+                let x = x + Vram::SCREEN_WIDTH as i32;
+                draw_fat_pixel(wheel, x, y, color);
+            }
+        }
+        for i in 0..Self::BORDER_H {
+            let ii = i + Self::BORDER_H + Vram::SCREEN_HEIGHT;
+            self.program.scanline(&mut self.context, ii);
+            let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
+            for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
+                draw_fat_pixel(wheel, x, ii as i32, color);
+            }
+        }
+
+        //todo: play sound
     }
 }
 
