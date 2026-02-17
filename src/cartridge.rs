@@ -4,6 +4,7 @@ use crate::cartridge::ram::{Vram, Ram};
 struct CartContext {
     ram: Vec<Ram>,
     active_bank: usize,
+    clip_rect: (i32, i32, i32, i32),
 }
 
 impl CartContext {
@@ -12,6 +13,7 @@ impl CartContext {
         Self {
             ram: vec![Ram::new(); Self::BANK_N],
             active_bank: 0,
+            clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
         }
     }
 
@@ -92,9 +94,88 @@ impl CartContext {
         }
     }
 
-    fn draw_while(&mut self, from: i32, to: i32, color: u32, coord: &dyn Fn(i32) -> (i32, i32)) {
+    fn in_clip(&self, x: i32, y: i32) -> bool {
+        x >= self.clip_rect.0 && x < self.clip_rect.0 + self.clip_rect.2
+            && y >= self.clip_rect.1 && y < self.clip_rect.1 + self.clip_rect.3
+    }
+    pub fn clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        self.clip_rect.0 = x.max(0);
+        self.clip_rect.1 = y.max(0);
+        self.clip_rect.2 = w.min(Vram::SCREEN_WIDTH as i32 - self.clip_rect.0);
+        self.clip_rect.3 = h.min(Vram::SCREEN_HEIGHT as i32 - self.clip_rect.1);
+    }
+
+    fn draw_while(&mut self, from: i32, to: i32, color: u8, coord: &dyn Fn(i32) -> (i32, i32)) {
+        for i in from..to {
+            let (x, y) = coord(i);
+            if !self.in_clip(x, y) {
+                break;
+            }
+            self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+        }
+    }
+
+    pub fn set_pix(&mut self, x: i32, y: i32, color: u8) {
+        if self.in_clip(x, y) {
+            self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+        }
+    }
+    pub fn get_pix(&mut self, x: i32, y: i32) -> u8 {
+        if self.in_clip(x, y) {
+            self.peek4(y as usize * Vram::SCREEN_WIDTH + x as usize)
+        } else {
+            255
+        }
+    }
+    pub fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u8) {
+        let x = x.max(self.clip_rect.0);
+        let y = y.max(self.clip_rect.1);
+        let w = w.min(self.clip_rect.0 + self.clip_rect.2 - x);
+        let h = h.min(self.clip_rect.1 + self.clip_rect.3 - y);
+        for yy in y..y + h {
+            for xx in x..x + w {
+                self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
+            }
+        }
+    }
+    pub fn rectb(&mut self, x: i32, y: i32, w: i32, h: i32, color: u8) {
+        let x_start = x.max(self.clip_rect.0);
+        let y_start = y.max(self.clip_rect.1);
+        self.draw_while(x_start, x + w, color, &(|x| (x, y)));
+        self.draw_while(x_start, x + w, color, &(|x| (x, y + h - 1)));
+        self.draw_while(y_start, y + h, color, &(|y| (x, y)));
+        self.draw_while(y_start, y + h, color, &(|y| (x + w - 1, y)));
+    }
+    pub fn cls(&mut self, color: u8) {
+        for y in self.clip_rect.1 .. self.clip_rect.1 + self.clip_rect.3 {
+            for x in self.clip_rect.0 .. self.clip_rect.0 + self.clip_rect.2 {
+                self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+            }
+        }
     }
 }
+
+pub trait CartProgram {
+    fn init(&mut self, context: &mut CartContext) {}
+    fn update(&mut self, context: &mut CartContext) {}
+    fn scanline(&mut self, context: &mut CartContext, line_i: usize) {}
+    fn overlay(&mut self, context: &mut CartContext) {}
+}
+
+struct Cartridge {
+    context: CartContext,
+    program: Box<dyn CartProgram>,
+}
+
+impl Cartridge {
+    pub fn new(program: Box<dyn CartProgram>) -> Self {
+        Self {
+            context: CartContext::new(),
+            program
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::cartridge::CartContext;
@@ -113,5 +194,8 @@ mod tests {
         context.set_pmem(12, 0x01234567);
         assert_eq!(context.get_pmem(12), 0x01234567);
         assert_eq!(context.peek(Ram::PERSISTENT_MEMORY_OFFSET + 12 * 4 + 1), 0x45);
+        context.set_pmem(12, 0xfedc9999u32 as i32);
+        assert_eq!(context.get_pmem(12), 0xfedc9999u32 as i32);
+
     }
 }
