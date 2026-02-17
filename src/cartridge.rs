@@ -61,7 +61,31 @@ impl CartContext {
     pub fn poke1(&mut self, addr: usize, val: u8) {
         self.poke_with_bits(addr, val, 1);
     }
-    
+    pub fn get_pmem(&self, index: usize) -> i32 {
+        if index < Ram::PERSISTENT_MEMORY_SIZE {
+            let addr = Ram::PERSISTENT_MEMORY_OFFSET + 4 * index;
+            let mut res: i32 = 0;
+            for i in 0..4 {
+                res |= (self.ram[self.active_bank][addr + i] as i32) << (i * 8);
+            }
+            res
+        } else {
+            0
+        }
+    }
+    pub fn set_pmem(&mut self, index: usize, val: i32) -> i32 {
+        if index < Ram::PERSISTENT_MEMORY_SIZE {
+            let addr = Ram::PERSISTENT_MEMORY_OFFSET + 4 * index;
+            let mut res: i32 = 0;
+            for i in 0..4 {
+                res |= (self.ram[self.active_bank][addr + i] as i32) << (i * 8);
+                self.ram[self.active_bank][addr + i] = ((val >> (i * 8)) & 0xff) as u8;
+            }
+            res
+        } else {
+            0
+        }
+    }
     pub fn vbank(&mut self, id: usize) {
         if id < Vram::VBANK_N {
             self.ram[self.active_bank].set_active_vbank(id);
@@ -86,5 +110,8 @@ mod tests {
         assert_eq!(context.peek4(0x12345 * 2), context.peek_with_bits(0x12345*2, 4));
         assert_eq!(context.peek4(0x12345 * 2), 0xb);
         assert_eq!(context.peek4(0x12345 * 2 + 1), 0xa);
+        context.set_pmem(12, 0x01234567);
+        assert_eq!(context.get_pmem(12), 0x01234567);
+        assert_eq!(context.peek(Ram::PERSISTENT_MEMORY_OFFSET + 12 * 4 + 1), 0x45);
     }
 }
