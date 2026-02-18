@@ -2,7 +2,7 @@ pub mod ram;
 use crate::cartridge::ram::{Vram, Ram};
 use std::collections::{HashSet, HashMap};
 
-struct CartContext {
+pub struct CartContext {
     ram: Vec<Ram>,
     active_bank: usize,
     clip_rect: (i32, i32, i32, i32),
@@ -157,6 +157,13 @@ impl CartContext {
                 self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
             }
         }
+    }
+
+    pub fn mouse(&self) -> (u8, u8, bool, bool, bool, i8, i8) {
+        let x = self.peek(Ram::MOUSE_OFFSET) as u8;
+        let y = self.peek(Ram::MOUSE_OFFSET + 1) as u8;
+        let res: u16 = self.peek(Ram::MOUSE_OFFSET + 2) as u16 | ((self.peek(Ram::MOUSE_OFFSET + 3) as u16) << 8);
+        (x, y, (res & 1) != 0, (res & 2) != 0, (res & 4) != 0, ((res >> 1) as i8) >> 2, ((res >> 7) as i8) >> 2)
     }
 }
 

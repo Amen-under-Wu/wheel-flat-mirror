@@ -112,62 +112,40 @@ impl Program {
     }
 }
 
-impl WheelProgram for Program {
-    fn init(&mut self, wheel: &mut dyn WheelInterface) {
-        for i in 0..graphics_device::Screen::WIDTH as i32 {
-            for j in 0..graphics_device::Screen::HEIGHT as i32 {
-                wheel.draw_pixel(i, j, 0xffffff);
+impl cartridge::CartProgram for Program {
+    fn init(&mut self, context: &mut cartridge::CartContext) {
+        context.poke(0x3fc4, 0xff);
+        for i in 0..240 {
+            for j in 0..136 {
+                if i + j % 2 == 0 {
+                    context.set_pix(i, j, 1);
+                }
             }
         }
     }
-    fn update(&mut self, wheel: &mut dyn WheelInterface) {
-        let mouse = wheel.get_mouse();
-        let x = mouse.x;
-        let y = mouse.y;
-        if mouse.left {
-            let rgb = self.rng.r#gen::<u32>();
-            for i in 0..graphics_device::Screen::WIDTH as i32 {
-                wheel.draw_pixel(i, y, rgb);
-            }
-            for i in 0..graphics_device::Screen::HEIGHT as i32 {
-                wheel.draw_pixel(x, i, rgb);
-            }
-        } else if mouse.right {
-            for i in 0..graphics_device::Screen::WIDTH as i32 {
-                wheel.draw_pixel(i, y, 0xffffff);
-            }
-            for i in 0..graphics_device::Screen::HEIGHT as i32 {
-                wheel.draw_pixel(x, i, 0xffffff);
-            }
+    fn update(&mut self, context: &mut cartridge::CartContext) {
+        let (x, y, left, _, right, _, _) = context.mouse();
+        if left {
+            context.set_pix(x.into(), y.into(), 1);
+            web_sys::console::log_1(&y.into());
+        } else if right {
+            context.set_pix(x.into(), y.into(), 0);
         }
-        let volumn = 15;
-        let freq = 440;
-        let mut waveform = [0; 32];
-        if self.t % 60 == 0 {
-            for i in 0..32 {
-                waveform[i] = if i < 16 {0} else {15};
-            }
-        } else if self.t % 60 == 30 {
-            for i in 0..32 {
-                waveform[i] = i as u8 / 2;
-            }
-        }
-        wheel.play(0, waveform, volumn, freq);
-        self.t += 1;
     }
 }
+
 
 #[wasm_bindgen]
 struct Wheel {
     context: WheelContext,
-    program: Program,
+    program: cartridge::Cartridge,
 }
 
 #[wasm_bindgen]
 impl Wheel {
     pub fn new(audio_context: web_sys::AudioContext) -> Self {
         let mut context = WheelContext::new(audio_context);
-        let mut program = Program::new();
+        let mut program = cartridge::Cartridge::new(Box::new(Program::new()));
         program.init(&mut context);
         Self {
             context,

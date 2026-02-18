@@ -25,8 +25,14 @@ impl Vram {
     pub const BLIT_SEGMENT_OFFSET: usize = Self::MOUSE_CURSOR_OFFSET + Self::MOUSE_CURSOR_BYTE_SIZE;
 
     pub fn new() -> Self {
+        let mut vbanks = [[0; Self::SIZE]; Self::VBANK_N];
+        for i in 0..2 {
+            for j in 0..8 {
+                vbanks[i][Self::PALETTE_MAP_OFFSET + j] = (j * 2 + (j * 2 + 1) * 16) as u8;
+            }
+        }
         Self {
-            vbanks: [[0; Self::SIZE]; Self::VBANK_N],
+            vbanks,
             active_vbank: 0,
         }
     }
