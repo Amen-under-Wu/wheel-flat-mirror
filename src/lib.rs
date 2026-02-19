@@ -1,5 +1,6 @@
 mod io_device;
 mod cartridge;
+mod data;
 use crate::io_device::{graphics_device, audio_device, input_device};
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
@@ -114,14 +115,13 @@ impl Program {
 
 impl cartridge::CartProgram for Program {
     fn init(&mut self, context: &mut cartridge::CartContext) {
-        context.poke(0x3fc4, 0xff);
         for i in 0..240 {
             for j in 0..136 {
                 if i % 8 == 0 {
-                    context.set_pix(i, j, 1);
+                    context.set_pix(i, j, 13);
                 }
                 if j % 8 == 0 {
-                    context.set_pix(i, j, 1);
+                    context.set_pix(i, j, 13);
                 }
             }
         }
@@ -129,8 +129,7 @@ impl cartridge::CartProgram for Program {
     fn update(&mut self, context: &mut cartridge::CartContext) {
         let (x, y, left, _, right, _, _) = context.mouse();
         if left {
-            context.set_pix(x.into(), y.into(), 1);
-            web_sys::console::log_1(&y.into());
+            context.set_pix(x.into(), y.into(), 13);
         } else if right {
             context.set_pix(x.into(), y.into(), 0);
         }

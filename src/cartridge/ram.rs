@@ -26,9 +26,13 @@ impl Vram {
 
     pub fn new() -> Self {
         let mut vbanks = [[0; Self::SIZE]; Self::VBANK_N];
+        let palette_default = crate::data::tic80_palette();
         for i in 0..2 {
             for j in 0..8 {
                 vbanks[i][Self::PALETTE_MAP_OFFSET + j] = (j * 2 + (j * 2 + 1) * 16) as u8;
+            }
+            for j in 0..48 {
+                vbanks[i][Self::PALETTE_OFFSET + j] = palette_default[j];
             }
         }
         Self {
@@ -88,7 +92,8 @@ impl Ram {
     pub const SFX_STATE_OFFSET: usize = Self::KEYBOARD_OFFSET + Self::KEYBOARD_BYTE_SIZE;
     const SFX_STATE_BYTE_SIZE: usize = 16;
     pub const SOUND_REGISTERS_OFFSET: usize = Self::SFX_STATE_OFFSET + Self::SFX_STATE_BYTE_SIZE;
-    const SOUND_REGISTERS_BYTE_SIZE: usize = 72;
+    pub const SOUND_REGISTER_SIZE: usize = 18;
+    const SOUND_REGISTERS_BYTE_SIZE: usize = Self::SOUND_REGISTER_SIZE * 4;
     pub const WAVEFORMS_OFFSET: usize = Self::SOUND_REGISTERS_OFFSET + Self::SOUND_REGISTERS_BYTE_SIZE;
     const WAVEFORMS_N: usize = 16;
     const WAVEFORM_SAMPLE_N: usize = 32;
@@ -111,14 +116,24 @@ impl Ram {
     pub const SPRITE_FLAGS_OFFSET: usize = Self::PERSISTENT_MEMORY_OFFSET + Self::PERSISTENT_MEMORY_BYTE_SIZE;
     const SPRITE_FLAGS_BYTE_SIZE: usize = Self::TILES_N + Self::SPRITES_N;
     pub const SYSTEM_FONT_OFFSET: usize = Self::SPRITE_FLAGS_OFFSET + Self::SPRITE_FLAGS_BYTE_SIZE;
-    const SYSTEM_FONT_BYTE_SIZE: usize = 2048;
-    pub const GAMEPAD_MAPPING_OFFSET: usize = Self::SYSTEM_FONT_OFFSET + Self::SYSTEM_FONT_BYTE_SIZE;
+    const SYSTEM_FONT_BYTE_SIZE: usize = 1024;
+    pub const ALT_FONT_OFFSET: usize = Self::SYSTEM_FONT_OFFSET + Self::SYSTEM_FONT_BYTE_SIZE;
+    const ALT_FONT_BYTE_SIZE: usize = 1024;
+    pub const GAMEPAD_MAPPING_OFFSET: usize = Self::ALT_FONT_OFFSET + Self::ALT_FONT_BYTE_SIZE;
     const GAMEPAD_MAPPING_BYTE_SIZE: usize = 32;
 
     pub fn new() -> Self {
+        let mut ram = [0; Self::SIZE - Vram::SIZE];
+        let font_data = crate::data::tic80_font();
+        for i in 0..(font_data.0.len()) {
+            ram[Self::SYSTEM_FONT_OFFSET - Vram::SIZE + i] = font_data.0[i];
+        }
+        for i in 0..(font_data.1.len()) {
+            ram[Self::ALT_FONT_OFFSET - Vram::SIZE + i] = font_data.1[i];
+        }
         Self {
             vram: Vram::new(),
-            ram: [0; Self::SIZE - Vram::SIZE],
+            ram,
         }
     }
     pub fn set_active_vbank(&mut self, id: usize) {
