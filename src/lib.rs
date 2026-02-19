@@ -117,7 +117,10 @@ impl cartridge::CartProgram for Program {
         context.poke(0x3fc4, 0xff);
         for i in 0..240 {
             for j in 0..136 {
-                if i + j % 2 == 0 {
+                if i % 8 == 0 {
+                    context.set_pix(i, j, 1);
+                }
+                if j % 8 == 0 {
                     context.set_pix(i, j, 1);
                 }
             }

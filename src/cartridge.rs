@@ -258,12 +258,12 @@ impl crate::WheelProgram for Cartridge {
         let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
         let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
         for i in 0..Vram::SCREEN_HEIGHT{
-            let y = (i + Self::BORDER_H) as i32 + y_offset;
+            let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
             for xx in 0..Vram::SCREEN_WIDTH {
                 let color_id = self.context.peek4(i * Vram::SCREEN_WIDTH + xx);
                 if color_id != trans_color {
                     let color = palette[color_id as usize];
-                    let x = (xx + Self::BORDER_W) as i32 + x_offset;
+                    let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                     draw_fat_pixel(wheel, x, y, color);
                     self.context.trans_map.insert((xx as i32, i as i32));
                 }
@@ -283,10 +283,10 @@ impl crate::WheelProgram for Cartridge {
             let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
             let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
             let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
-            let y = (i + Self::BORDER_H) as i32 + y_offset;
+            let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
             for xx in 0..Vram::SCREEN_WIDTH {
                 let color = palette[self.context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
-                let x = (xx + Self::BORDER_W) as i32 + x_offset;
+                let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                 if !self.context.trans_map.contains(&(xx as i32, i as i32)) {
                     draw_fat_pixel(wheel, x, y, color);
                 }
@@ -294,7 +294,7 @@ impl crate::WheelProgram for Cartridge {
             let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
             for x in 0..Self::BORDER_W as i32 {
                 draw_fat_pixel(wheel, x, y, color);
-                let x = x + Vram::SCREEN_WIDTH as i32;
+                let x = x + (Self::BORDER_W + Vram::SCREEN_WIDTH) as i32;
                 draw_fat_pixel(wheel, x, y, color);
             }
         }
