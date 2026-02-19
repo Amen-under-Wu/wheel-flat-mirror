@@ -118,10 +118,10 @@ impl cartridge::CartProgram for Program {
         for i in 0..240 {
             for j in 0..136 {
                 if i % 8 == 0 {
-                    context.set_pix(i, j, 13);
+                    context.set_pix(i, j, 1);
                 }
                 if j % 8 == 0 {
-                    context.set_pix(i, j, 13);
+                    context.set_pix(i, j, 1);
                 }
             }
         }
@@ -129,9 +129,13 @@ impl cartridge::CartProgram for Program {
     fn update(&mut self, context: &mut cartridge::CartContext) {
         let (x, y, left, _, right, _, _) = context.mouse();
         if left {
-            context.set_pix(x.into(), y.into(), 13);
+            context.set_pix(x.into(), y.into(), 1);
         } else if right {
             context.set_pix(x.into(), y.into(), 0);
+        }
+        if context.btnp_with_hold_period(4, 60, 10) || context.keyp_with_hold_period(2, 60, 10) {
+            let color1 = (context.peek4(0x3ff0 * 2 + 1) + 1) % 16;
+            context.poke4(0x3ff0 * 2 + 1, color1);
         }
     }
 }

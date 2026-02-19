@@ -8,6 +8,7 @@ pub struct CartContext {
     clip_rect: (i32, i32, i32, i32),
     trans_map: HashSet<(i32, i32)>,
     key_timer: HashMap<u8, u32>,
+    btn_timer: [i32; 32],
 }
 
 impl CartContext {
@@ -19,6 +20,7 @@ impl CartContext {
             clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
             trans_map: HashSet::new(),
             key_timer: HashMap::new(),
+            btn_timer: [0; 32],
         }
     }
 
@@ -159,6 +161,47 @@ impl CartContext {
         }
     }
 
+    pub fn btn(&self, id: u8) -> bool {
+        id < 32 && self.peek1(Ram::GAMEPADS_OFFSET * 8 + id as usize) == 1
+    }
+    pub fn btnp(&self, id: u8) -> bool {
+        id < 32 && self.btn_timer[id as usize] == 0
+    }
+    pub fn btnp_with_hold_period(&self, id: u8, hold: i32, period: i32) -> bool {
+        let hold = hold.max(0);
+        let period = period.max(1);
+        id < 32 && {
+            let time = self.btn_timer[id as usize];
+            time == 0 || (time > hold && (time - hold) % period == 0)
+        }
+    }
+    pub fn key(&self, key_code: Option<u8>) -> bool {
+        let key_buffer: Vec<u8> = (0..4).into_iter().map(|i| self.peek(Ram::KEYBOARD_OFFSET + i)).collect();
+        match key_code {
+            Some(code) => key_buffer.contains(&code),
+            None => (key_buffer[0] | key_buffer[1] | key_buffer[2] | key_buffer[3]) != 0,
+        }
+    }
+    pub fn keyp(&self, key_code: Option<u8>) -> bool {
+        match key_code {
+            Some(code) => self.key_timer.get(&code) == Some(&0),
+            None => {
+                let mut flag = false;
+                for (_, time) in self.key_timer.iter() {
+                    flag = flag || (*time == 0);
+                }
+                flag
+            }
+        }
+    }
+    pub fn keyp_with_hold_period(&self, key_code: u8, hold: i32, period: i32) -> bool {
+        let hold = hold.max(0) as u32;
+        let period = period.max(1) as u32;
+        match self.key_timer.get(&key_code) {
+            None => false,
+            Some(&time) => time == 0 || (time > hold && (time - hold) % period == 0)
+        }
+    }
     pub fn mouse(&self) -> (u8, u8, bool, bool, bool, i8, i8) {
         let x = self.peek(Ram::MOUSE_OFFSET) as u8;
         let y = self.peek(Ram::MOUSE_OFFSET + 1) as u8;
@@ -205,24 +248,52 @@ fn draw_fat_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, color: 
 }
 
 impl crate::WheelProgram for Cartridge {
-    fn init(&mut self, wheel: &mut dyn crate::WheelInterface) {
+    fn init(&mut self, _wheel: &mut dyn crate::WheelInterface) {
         self.program.init(&mut self.context);
     }
     fn update(&mut self, wheel: &mut dyn crate::WheelInterface) {
         // get input
-        let btns = wheel.get_buttons();
+        let mut btns = wheel.get_buttons();
         let keys = wheel.get_keys();
-        for i in 0..4 {
-            self.context.poke(Ram::GAMEPADS_OFFSET, btns[i]);
-            self.context.poke(Ram::KEYBOARD_OFFSET, keys[i]);
-        }
+
         let mut gamepad_map = 0;
         for i in 0..8 {
             if keys.contains(&self.context.peek(Ram::GAMEPAD_MAPPING_OFFSET + i)) {
                 gamepad_map |= 1 << i;
             }
         }
-        self.context.poke(Ram::GAMEPADS_OFFSET, gamepad_map);
+        btns[0] |= gamepad_map;
+        for i in 0..4 {
+            self.context.poke(Ram::GAMEPADS_OFFSET, btns[i]);
+            self.context.poke(Ram::KEYBOARD_OFFSET, keys[i]);
+        }
+
+        // use direct input to update, instead of ram data
+        // correctness to be confirmed
+        let btn_bin = u32::from_le_bytes(btns);
+        for i in 0..32 {
+            if (btn_bin & (1 << i)) == 0 {
+                self.context.btn_timer[i] = -1;
+            } else {
+                self.context.btn_timer[i] += 1;
+            }
+        }
+        let mut key_del_list = Vec::new();
+        for (key, time) in self.context.key_timer.iter_mut() {
+            if keys.contains(key) {
+                *time += 1;
+            } else {
+                key_del_list.push(*key);
+            }
+        }
+        for key in key_del_list {
+            self.context.key_timer.remove(&key);
+        }
+        for key in keys {
+            if !self.context.key_timer.contains_key(&key) {
+                self.context.key_timer.insert(key, 0);
+            }
+        }
         let mouse = wheel.get_mouse();
         let mouse_x = 
             if mouse.x > 0 && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32 {
@@ -307,7 +378,7 @@ impl crate::WheelProgram for Cartridge {
             }
         }
 
-        // todo: update sound
+        // todo: play sound
     }
 }
 

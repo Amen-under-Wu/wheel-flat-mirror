@@ -131,6 +131,10 @@ impl Ram {
         for i in 0..(font_data.1.len()) {
             ram[Self::ALT_FONT_OFFSET - Vram::SIZE + i] = font_data.1[i];
         }
+        let key_map = crate::data::default_key_map();
+        for i in 0..8 {
+            ram[Self::GAMEPAD_MAPPING_OFFSET - Vram::SIZE + i] = key_map[i];
+        }
         Self {
             vram: Vram::new(),
             ram,
