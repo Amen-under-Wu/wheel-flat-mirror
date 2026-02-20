@@ -113,17 +113,19 @@ impl CartContext {
     }
 
     fn draw_while(&mut self, from: i32, to: i32, color: u8, coord: &dyn Fn(i32) -> (i32, i32)) {
-        for i in from..to {
-            let (x, y) = coord(i);
-            if !self.in_clip(x, y) {
-                break;
+        if color < 16 {
+            for i in from..to {
+                let (x, y) = coord(i);
+                if !self.in_clip(x, y) {
+                    break;
+                }
+                self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
             }
-            self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
         }
     }
 
     pub fn set_pix(&mut self, x: i32, y: i32, color: u8) {
-        if self.in_clip(x, y) {
+        if self.in_clip(x, y) && color < 16 {
             self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
         }
     }
@@ -152,6 +154,147 @@ impl CartContext {
         self.draw_while(x_start, x + w, color, &(|x| (x, y + h - 1)));
         self.draw_while(y_start, y + h, color, &(|y| (x, y)));
         self.draw_while(y_start, y + h, color, &(|y| (x + w - 1, y)));
+    }
+    fn hline(&mut self, x: i32, y: i32, w: i32, color: u8) {
+        let x_start = x.max(self.clip_rect.0);
+        self.draw_while(x_start, x + w, color, &(|x| (x, y)));
+    }
+    fn vline(&mut self, x: i32, y: i32, h: i32, color: u8) {
+        let y_start = y.max(self.clip_rect.1);
+        self.draw_while(y_start, y + h, color, &(|y| (x, y)));
+    }
+    pub fn line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: u8) {
+        let (x1, x2, y1, y2) = if x1 > x2 { (x2, x1, y2, y1) } else { (x1, x2, y1, y2) };
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+        let mut xi = x1.floor();
+        let mut yi;
+        if dy < 0.0 {
+            yi = y1.ceil();
+            if -dy > dx {
+                while yi >= y2 {
+                    self.set_pix(xi as i32, yi as i32, color);
+                    yi -= 1.0;
+                    if -(dx * yi - dy * xi - dx * y1 + dy * x1) > dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1 {
+                        xi += 1.0;
+                    }
+                }
+            } else {
+                while xi <= x2 {
+                    self.set_pix(xi as i32, yi as i32, color);
+                    xi += 1.0;
+                    if dx * yi - dy * xi - dx * y1 + dy * x1 > -(dx * (yi - 1.0) - dy * xi - dx * y1 + dy * x1) {
+                        yi -= 1.0;
+                    }
+                }
+            }
+        } else {
+            yi = y1.floor();
+            if dy > dx {
+                while yi <= y2 {
+                    self.set_pix(xi as i32, yi as i32, color);
+                    yi += 1.0;
+                    if dx * yi - dy * xi - dx * y1 + dy * x1 > -(dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1) {
+                        xi += 1.0;
+                    }
+                }
+            } else {
+                while xi <= x2 {
+                    self.set_pix(xi as i32, yi as i32, color);
+                    xi += 1.0;
+                    if -(dx * yi - dy * xi - dx * y1 + dy * x1) > dx * (yi + 1.0) - dy * xi - dx * y1 + dy * x1 {
+                        yi += 1.0;
+                    }
+                }
+            }
+        }
+    }
+    pub fn circ(&mut self, x: i32, y: i32, r: i32, color: u8) {
+        if r > 0 {
+            self.hline(x - r, y, r * 2 + 1, color);
+            self.vline(x, y - r, r * 2 + 1, color);
+            let mut rx: i32 = r;
+            let mut ry: i32 = 0;
+            while rx > ry + 1 {
+                ry += 1;
+                if rx * rx + ry * ry - r * r > -((rx - 1) * (rx - 1) + ry * ry - r * r) {
+                    rx -= 1;
+                }
+                self.hline(x - rx, y + ry, rx * 2 + 1, color);
+                self.hline(x - rx, y - ry, rx * 2 + 1, color);
+                self.hline(x - ry, y + rx, ry * 2 + 1, color);
+                self.hline(x - ry, y - rx, ry * 2 + 1, color);
+            }
+        }
+    }
+    pub fn circb(&mut self, x: i32, y: i32, r: i32, color: u8) {
+        if r > 0 {
+            self.set_pix(x + r, y, color);
+            self.set_pix(x - r, y, color);
+            self.set_pix(x, y + r, color);
+            self.set_pix(x, y - r, color);
+            let mut rx: i32 = r;
+            let mut ry: i32 = 0;
+            while rx > ry + 1 {
+                ry += 1;
+                if rx * rx + ry * ry - r * r > -((rx - 1) * (rx - 1) + ry * ry - r * r) {
+                    rx -= 1;
+                }
+                self.set_pix(x + rx, y + ry, color);
+                self.set_pix(x + rx, y - ry, color);
+                self.set_pix(x - rx, y + ry, color);
+                self.set_pix(x - rx, y - ry, color);
+                self.set_pix(x + ry, y + rx, color);
+                self.set_pix(x + ry, y - rx, color);
+                self.set_pix(x - ry, y + rx, color);
+                self.set_pix(x - ry, y - rx, color);
+            }
+        }
+    }
+    fn elli_d(rx: i32, ry: i32, a: i32, b: i32) -> i32 {
+        (rx * rx * b * b + ry * ry * a * a - a * a * b * b).abs()
+    }
+    pub fn elli(&mut self, x: i32, y: i32, a: i32, b: i32, color: u8) {
+        if a > 0 && b > 0 && color < 16 {
+            let mut rx = a;
+            let mut ry = 0;
+            while ry < b {
+                self.hline(x - rx, y + ry, rx * 2 + 1, color);
+                self.hline(x - rx, y - ry, rx * 2 + 1, color);
+                if Self::elli_d(rx - 1, ry + 1, a, b) < Self::elli_d(rx, ry + 1, a, b) {
+                    rx -= 1;
+                    if Self::elli_d(rx - 1, ry + 1, a, b) < Self::elli_d(rx - 1, ry, a, b) {
+                        ry += 1;
+                    }
+                } else {
+                    ry += 1;
+                }
+            }
+            self.hline(x - rx, y + b, rx * 2 + 1, color);
+            self.hline(x - rx, y - b, rx * 2 + 1, color);
+        }
+    }
+    pub fn ellib(&mut self, x: i32, y: i32, a: i32, b: i32, color: u8) {
+        if a > 0 && b > 0 && color < 16 {
+            let mut rx = a;
+            let mut ry = 0;
+            while ry < b {
+                self.set_pix(x + rx, y + ry, color);
+                self.set_pix(x + rx, y - ry, color);
+                self.set_pix(x - rx, y + ry, color);
+                self.set_pix(x - rx, y - ry, color);
+                if Self::elli_d(rx - 1, ry + 1, a, b) < Self::elli_d(rx, ry + 1, a, b) {
+                    rx -= 1;
+                    if Self::elli_d(rx - 1, ry + 1, a, b) < Self::elli_d(rx - 1, ry, a, b) {
+                        ry += 1;
+                    }
+                } else {
+                    ry += 1;
+                }
+            }
+            self.hline(x - rx, y + b, rx * 2 + 1, color);
+            self.hline(x - rx, y - b, rx * 2 + 1, color);
+        }
     }
     pub fn cls(&mut self, color: u8) {
         for y in self.clip_rect.1 .. self.clip_rect.1 + self.clip_rect.3 {

@@ -100,15 +100,19 @@ pub trait WheelProgram {
 }
 
 struct Program {
-    rng: rand::rngs::ThreadRng,
-    t: u32,
+    _rng: rand::rngs::ThreadRng,
+    _t: u32,
+    click_pos: (i32, i32),
+    shape: i32,
 }
 
 impl Program {
     fn new() -> Self {
         Self {
-            rng: rand::thread_rng(),
-            t: 0
+            _rng: rand::thread_rng(),
+            _t: 0,
+            click_pos: (0, 0),
+            shape: 0,
         }
     }
 }
@@ -127,15 +131,34 @@ impl cartridge::CartProgram for Program {
         }
     }
     fn update(&mut self, context: &mut cartridge::CartContext) {
-        let (x, y, left, _, right, _, _) = context.mouse();
+        context.cls(0);
+        let (x, y, left, _, _, _, _) = context.mouse();
+        let x: i32 = x.into();
+        let y: i32 = y.into();
         if left {
-            context.set_pix(x.into(), y.into(), 1);
-        } else if right {
-            context.set_pix(x.into(), y.into(), 0);
+            if self.click_pos == (-1, -1) {
+                self.click_pos = (x, y);
+            }
+            match self.shape {
+                0 => { context.rect(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
+                1 => { context.rectb(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
+                2 => { context.circ(self.click_pos.0, self.click_pos.1, ((x - self.click_pos.0).abs() + 1).max((y - self.click_pos.1).abs() + 1), 1); }
+                3 => { context.circb(self.click_pos.0, self.click_pos.1, ((x - self.click_pos.0).abs() + 1).max((y - self.click_pos.1).abs() + 1), 1); }
+                4 => { context.elli(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
+                5 => { context.ellib(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
+                6 => { context.line(self.click_pos.0 as f32, self.click_pos.1 as f32, x as f32, y as f32, 1); }, 
+                _ => (),
+            }
+        } else {
+            self.click_pos = (-1, -1);
         }
         if context.btnp_with_hold_period(4, 60, 10) || context.keyp_with_hold_period(2, 60, 10) {
             let color1 = (context.peek4(0x3ff0 * 2 + 1) + 1) % 16;
             context.poke4(0x3ff0 * 2 + 1, color1);
+        }
+        if context.btnp(5) {
+            self.shape += 1;
+            self.shape %= 7;
         }
     }
 }
