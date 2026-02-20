@@ -24,6 +24,8 @@ impl CartContext {
         }
     }
 
+    // memory manipulations
+
     pub fn memcpy(&mut self, from: usize, to: usize, length: usize) {
         let buffer: Vec<u8> = (from..from + length).into_iter().map(|x| self.ram[self.active_bank][x]).collect();
         for i in 0..length {
@@ -100,6 +102,8 @@ impl CartContext {
             self.ram[self.active_bank].set_active_vbank(id);
         }
     }
+
+    // graphics
 
     fn in_clip(&self, x: i32, y: i32) -> bool {
         x >= self.clip_rect.0 && x < self.clip_rect.0 + self.clip_rect.2
@@ -303,6 +307,62 @@ impl CartContext {
             }
         }
     }
+
+    fn putchar(&mut self, chr: u8, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
+        let chr: usize = (chr % 128).into(); // ascii characters only
+        let font_offset = if alt_font { Ram::ALT_FONT_OFFSET } else { Ram::SYSTEM_FONT_OFFSET };
+        if is_fixed {
+            for i in 0..8 {
+                let line_data = self.peek(font_offset + chr * 8 + i);
+                for j in 0..8 {
+                    if ((line_data >> j) & 1) != 0 {
+                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    }
+                }
+            }
+            self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE).into()
+        } else {
+            let mut chr_bin = [0; 8];
+            let mut max_bit = 0;
+            let mut min_bit = 7;
+            let mut zero_flag = true;
+            for i in 0..8 {
+                chr_bin[i] = self.peek(font_offset + chr * 8 + i);
+                if chr_bin[i] != 0 {
+                    zero_flag = false;
+                    max_bit = max_bit.max(chr_bin[i].ilog2() as i32);
+                    min_bit = min_bit.min(chr_bin[i].trailing_zeros() as i32);
+                }
+            }
+            for i in 0..8 {
+                for j in 0..(8 - min_bit) {
+                    if ((chr_bin[i] >> (j + min_bit)) & 1) != 0 {
+                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    }
+                }
+            }
+            scale * (if zero_flag { self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE) as i32 - 2 } else { max_bit - min_bit + 2 })
+        }
+    }
+
+    pub fn print(&mut self, text: &str, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
+        let mut text_width = 0;
+        let mut x_offset = 0;
+        let mut y = y;
+        let chr_height: i32 = scale * self.peek((if alt_font { Ram::ALT_FONT_OFFSET } else { Ram::SYSTEM_FONT_OFFSET }) + Ram::FONT_PARAM_OFFSET_RELATIVE + 1) as i32;
+        for &chr in text.as_bytes() {
+            if chr == '\n' as u8 {
+                text_width = text_width.max(x_offset);
+                x_offset = 0;
+                y += chr_height;
+            } else {
+                x_offset += self.putchar(chr, x + x_offset, y, color, is_fixed, scale, alt_font);
+            }
+        }
+        text_width.max(x_offset)
+    }
+
+    // inputs
 
     pub fn btn(&self, id: u8) -> bool {
         id < 32 && self.peek1(Ram::GAMEPADS_OFFSET * 8 + id as usize) == 1

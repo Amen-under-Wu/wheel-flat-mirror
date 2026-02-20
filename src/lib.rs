@@ -99,67 +99,65 @@ pub trait WheelProgram {
     fn update(&mut self, wheel: &mut dyn WheelInterface) {}
 }
 
+use std::collections::HashMap;
+
 struct Program {
-    _rng: rand::rngs::ThreadRng,
-    _t: u32,
-    click_pos: (i32, i32),
-    shape: i32,
+    rng: rand::rngs::ThreadRng,
+    i32_data: HashMap<String, i32>,
 }
 
 impl Program {
     fn new() -> Self {
         Self {
-            _rng: rand::thread_rng(),
-            _t: 0,
-            click_pos: (0, 0),
-            shape: 0,
+            rng: rand::thread_rng(),
+            i32_data: HashMap::new(),
         }
     }
 }
 
 impl cartridge::CartProgram for Program {
     fn init(&mut self, context: &mut cartridge::CartContext) {
-        for i in 0..240 {
-            for j in 0..136 {
-                if i % 8 == 0 {
-                    context.set_pix(i, j, 1);
-                }
-                if j % 8 == 0 {
-                    context.set_pix(i, j, 1);
-                }
-            }
-        }
+        self.i32_data.insert("t".to_string(), 0);
+        self.i32_data.insert("x".to_string(), 0);
+        self.i32_data.insert("y".to_string(), 0);
+        self.i32_data.insert("shape".to_string(), 0);
+        self.i32_data.insert("color".to_string(), 1);
     }
     fn update(&mut self, context: &mut cartridge::CartContext) {
         context.cls(0);
+        context.print("Hello World!", 100, 100, 13, false, 2, false);
         let (x, y, left, _, _, _, _) = context.mouse();
         let x: i32 = x.into();
         let y: i32 = y.into();
         if left {
-            if self.click_pos == (-1, -1) {
-                self.click_pos = (x, y);
+            if self.i32_data["x"] == -1 {
+                *self.i32_data.get_mut("x").unwrap() = x;
+                *self.i32_data.get_mut("y").unwrap() = y;
             }
-            match self.shape {
-                0 => { context.rect(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
-                1 => { context.rectb(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
-                2 => { context.circ(self.click_pos.0, self.click_pos.1, ((x - self.click_pos.0).abs() + 1).max((y - self.click_pos.1).abs() + 1), 1); }
-                3 => { context.circb(self.click_pos.0, self.click_pos.1, ((x - self.click_pos.0).abs() + 1).max((y - self.click_pos.1).abs() + 1), 1); }
-                4 => { context.elli(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
-                5 => { context.ellib(self.click_pos.0, self.click_pos.1, (x - self.click_pos.0).abs() + 1, (y - self.click_pos.1).abs() + 1, 1); }, 
-                6 => { context.line(self.click_pos.0 as f32, self.click_pos.1 as f32, x as f32, y as f32, 1); }, 
+            let x0 = self.i32_data["x"];
+            let y0 = self.i32_data["y"];
+            let color = self.i32_data["color"] as u8;
+            match self.i32_data["shape"] {
+                0 => { context.rect(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
+                1 => { context.rectb(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
+                2 => { context.circ(x0, y0, ((x - x0).abs() + 1).max((y - y0).abs() + 1), color); }
+                3 => { context.circb(x0, y0, ((x - x0).abs() + 1).max((y - y0).abs() + 1), color); }
+                4 => { context.elli(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
+                5 => { context.ellib(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
+                6 => { context.line(x0 as f32, y0 as f32, x as f32, y as f32, color); }, 
                 _ => (),
             }
         } else {
-            self.click_pos = (-1, -1);
+            *self.i32_data.get_mut("x").unwrap() = -1;
+            *self.i32_data.get_mut("y").unwrap() = -1;
         }
         if context.btnp_with_hold_period(4, 60, 10) || context.keyp_with_hold_period(2, 60, 10) {
-            let color1 = (context.peek4(0x3ff0 * 2 + 1) + 1) % 16;
-            context.poke4(0x3ff0 * 2 + 1, color1);
+            self.i32_data.entry("color".to_string()).and_modify(|x| *x = (*x + 1) % 16).or_insert(0);
         }
         if context.btnp(5) {
-            self.shape += 1;
-            self.shape %= 7;
+            self.i32_data.entry("shape".to_string()).and_modify(|x| *x = (*x + 1) % 7).or_insert(0);
         }
+        self.i32_data.entry("t".to_string()).and_modify(|x| *x += 1).or_insert(0);
     }
 }
 

@@ -119,6 +119,7 @@ impl Ram {
     const SYSTEM_FONT_BYTE_SIZE: usize = 1024;
     pub const ALT_FONT_OFFSET: usize = Self::SYSTEM_FONT_OFFSET + Self::SYSTEM_FONT_BYTE_SIZE;
     const ALT_FONT_BYTE_SIZE: usize = 1024;
+    pub const FONT_PARAM_OFFSET_RELATIVE: usize = Self::SYSTEM_FONT_BYTE_SIZE - 8;
     pub const GAMEPAD_MAPPING_OFFSET: usize = Self::ALT_FONT_OFFSET + Self::ALT_FONT_BYTE_SIZE;
     const GAMEPAD_MAPPING_BYTE_SIZE: usize = 32;
 
