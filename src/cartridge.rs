@@ -344,7 +344,6 @@ impl CartContext {
             scale * (if zero_flag { self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE) as i32 - 2 } else { max_bit - min_bit + 2 })
         }
     }
-
     pub fn print(&mut self, text: &str, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
         let mut text_width = 0;
         let mut x_offset = 0;
@@ -360,6 +359,117 @@ impl CartContext {
             }
         }
         text_width.max(x_offset)
+    }
+
+    const fn spr_pix_arr() -> [(usize, usize); Ram::SPRITE_W * Ram::SPRITE_H] {
+        let mut arr = [(0, 0); Ram::SPRITE_W * Ram::SPRITE_H];
+        let mut i = 0;
+        while i < Ram::SPRITE_W * Ram::SPRITE_H {
+            let y = i / Ram::SPRITE_W;
+            let x = i % Ram::SPRITE_W;
+            arr[i] = (x, y);
+            i += 1;
+        }
+        arr
+    }
+    const SPR_PIX_ARR: [(usize, usize); Ram::SPRITE_W * Ram::SPRITE_H] = Self::spr_pix_arr();
+    fn get_spr_pix(&self, id: usize, x: usize, y: usize, bpp: usize) -> u8 {
+        self.peek_with_bits(Ram::TILES_OFFSET * 8 / bpp + id * Ram::SPRITE_W * Ram::SPRITE_H + y * Ram::SPRITE_W + x, bpp)
+    }
+    fn spr_mono_unchecked(&mut self, id: usize, x: i32, y: i32, trans_color: u8, scale: i32, flip: u8, rotate: u8, bpp: usize) {
+        match (rotate << 2) + flip {
+            0 | 11 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, j, i, bpp);
+                    if color != trans_color {
+                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            1 | 10 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, i, bpp);
+                    if color != trans_color {
+                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            2 | 9 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, j, Ram::SPRITE_H - i - 1, bpp);
+                    if color != trans_color {
+                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            3 | 8 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, Ram::SPRITE_H - i - 1, bpp);
+                    if color != trans_color {
+                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            4 | 15 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, i, bpp);
+                    if color != trans_color {
+                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            5 | 14 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, Ram::SPRITE_H - i - 1, bpp);
+                    if color != trans_color {
+                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            6 | 13 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, j, i, bpp);
+                    if color != trans_color {
+                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            7 | 12 => {
+                for (i, j) in Self::SPR_PIX_ARR {
+                    let color = self.get_spr_pix(id, j, Ram::SPRITE_H - i - 1, bpp);
+                    if color != trans_color {
+                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                    }
+                }
+            },
+            _ => (),
+        }
+    }
+    pub fn spr(&mut self, id: i32, x: i32, y: i32, trans_color: u8, scale: i32, flip: i32, rotate: i32, w: i32, h: i32) {
+        const N: i32 = (Ram::CANVAS_W * Ram::CANVAS_H) as i32;
+        let id = (id.clamp(0, N) % N) as usize;
+        let flip = (flip.clamp(0, 4) % 4) as u8;
+        let rotate = (rotate.clamp(0, 4) % 4) as u8;
+        let w = w.min((Ram::CANVAS_W - id % Ram::CANVAS_W) as i32);
+        let bpp = 8 / self.peek4(Vram::BLIT_SEGMENT_OFFSET * 2) as usize;
+        for i in 0..h {
+            if (id as i32 % N) / Ram::CANVAS_W as i32 + i > Ram::CANVAS_H as i32 {
+                break;
+            }
+            for j in 0..w {
+                match (rotate << 2) | flip {
+                    0 | 11 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + j * Ram::SPRITE_W as i32 * scale, y + i * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    1 | 10 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (w - j - 1) * Ram::SPRITE_W as i32 * scale, y + i * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    2 | 9 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + j * Ram::SPRITE_W as i32 * scale, y + (h - i - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    3 | 8 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (w - j - 1) * Ram::SPRITE_W as i32 * scale, y + (h - i - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    4 | 15 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + i * Ram::SPRITE_W as i32 * scale, y + (w - j - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    5 | 14 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (h - i - 1) * Ram::SPRITE_W as i32 * scale, y + (w - j - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    6 | 13 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + i * Ram::SPRITE_W as i32 * scale, y + j * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    7 | 12 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (h - i - 1) * Ram::SPRITE_W as i32 * scale, y + j * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    _ => (),
+                } 
+            }
+        }
     }
 
     // inputs
@@ -467,8 +577,8 @@ impl crate::WheelProgram for Cartridge {
         }
         btns[0] |= gamepad_map;
         for i in 0..4 {
-            self.context.poke(Ram::GAMEPADS_OFFSET, btns[i]);
-            self.context.poke(Ram::KEYBOARD_OFFSET, keys[i]);
+            self.context.poke(Ram::GAMEPADS_OFFSET + i, btns[i]);
+            self.context.poke(Ram::KEYBOARD_OFFSET + i, keys[i]);
         }
 
         // use direct input to update, instead of ram data
@@ -598,6 +708,7 @@ mod tests {
         let mut context = CartContext::new();
         assert_eq!(Vram::BLIT_SEGMENT_OFFSET, 0x3ffc);
         assert_eq!(Ram::GAMEPAD_MAPPING_OFFSET, 0x14e04);
+        assert_eq!(Ram::GAMEPADS_OFFSET, 0xff80);
         //context.poke(0x12345, 0xab);
         context.poke_with_bits(0x12345 * 2, 0xb, 4);
         context.poke_with_bits(0x12345 * 2 + 1, 0xa, 4);

@@ -34,6 +34,7 @@ impl Vram {
             for j in 0..48 {
                 vbanks[i][Self::PALETTE_OFFSET + j] = palette_default[j];
             }
+            vbanks[i][Self::BLIT_SEGMENT_OFFSET] = 2;
         }
         Self {
             vbanks,
@@ -69,15 +70,19 @@ impl Ram {
     pub const SIZE: usize = 0x18000;
     pub const TILES_OFFSET: usize = Vram::SIZE;
     const BPP: usize = 4;
-    const TILES_N: usize = 256;
-    const TILE_W: usize = 8;
-    const TILE_H: usize = 8;
-    const TILES_BYTE_SIZE: usize = Self::TILE_W * Self::TILE_H * Self::TILES_N * Self::BPP / 8;
+    pub const CANVAS_W: usize = 16;
+    pub const CANVAS_H: usize = 16;
+    const TILES_N: usize = Self::CANVAS_W * Self::CANVAS_H;
+    pub const TILE_W: usize = 8;
+    pub const TILE_H: usize = 8;
+    pub const TILE_BYTE_SIZE: usize = Self::TILE_W * Self::TILE_H * Self::BPP / 8;
+    const TILES_BYTE_SIZE: usize = Self::TILES_N * Self::TILE_BYTE_SIZE;
     pub const SPRITES_OFFSET: usize = Self::TILES_OFFSET + Self::TILES_BYTE_SIZE;
-    const SPRITES_N: usize = 256;
-    const SPRITE_W: usize = 8;
-    const SPRITE_H: usize = 8;
-    const SPRITES_BYTE_SIZE: usize = Self::SPRITE_W * Self::SPRITE_H * Self::SPRITES_N * Self::BPP / 8;
+    const SPRITES_N: usize = Self::TILES_N;
+    pub const SPRITE_W: usize = 8;
+    pub const SPRITE_H: usize = 8;
+    pub const SPRITE_BYTE_SIZE: usize = Self::SPRITE_W * Self::SPRITE_H * Self::BPP / 8;
+    const SPRITES_BYTE_SIZE: usize = Self::SPRITES_N * Self::SPRITE_BYTE_SIZE;
     pub const MAP_OFFSET: usize = Self::SPRITES_OFFSET + Self::SPRITES_BYTE_SIZE;
     const MAP_W: usize = 240;
     const MAP_H: usize = 136;
@@ -135,6 +140,10 @@ impl Ram {
         let key_map = crate::data::default_key_map();
         for i in 0..8 {
             ram[Self::GAMEPAD_MAPPING_OFFSET - Vram::SIZE + i] = key_map[i];
+        }
+        let mascot = crate::data::tic80_mascot_spr();
+        for i in 0..mascot.len() {
+            ram[Self::TILES_OFFSET - Vram::SIZE + i] = mascot[i];
         }
         Self {
             vram: Vram::new(),

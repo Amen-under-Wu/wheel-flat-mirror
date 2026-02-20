@@ -120,12 +120,29 @@ impl cartridge::CartProgram for Program {
         self.i32_data.insert("t".to_string(), 0);
         self.i32_data.insert("x".to_string(), 0);
         self.i32_data.insert("y".to_string(), 0);
+        self.i32_data.insert("sx".to_string(), 96);
+        self.i32_data.insert("sy".to_string(), 24);
         self.i32_data.insert("shape".to_string(), 0);
         self.i32_data.insert("color".to_string(), 1);
     }
     fn update(&mut self, context: &mut cartridge::CartContext) {
-        context.cls(0);
-        context.print("Hello World!", 100, 100, 13, false, 2, false);
+        context.cls(13);
+        context.print("Hello World!", 84, 84, 0, false, 2, false);
+        context.print(&context.peek(0xff80).to_string(), 0, 0, 0, false, 1, false);
+        if context.btn(0) {
+            web_sys::console::log_1(&"up".into());
+            self.i32_data.entry("sy".to_string()).and_modify(|y| *y -= 1).or_insert(24);
+        }
+        if context.btn(1) {
+            self.i32_data.entry("sy".to_string()).and_modify(|y| *y += 1).or_insert(24);
+        }
+        if context.btn(2) {
+            self.i32_data.entry("sx".to_string()).and_modify(|x| *x -= 1).or_insert(96);
+        }
+        if context.btn(3) {
+            self.i32_data.entry("sx".to_string()).and_modify(|x| *x += 1).or_insert(96);
+        }
+        context.spr(1+self.i32_data["t"]%60/30*2,self.i32_data["sx"],self.i32_data["sy"],14,3,0,0,2,2);
         let (x, y, left, _, _, _, _) = context.mouse();
         let x: i32 = x.into();
         let y: i32 = y.into();
@@ -157,6 +174,7 @@ impl cartridge::CartProgram for Program {
         if context.btnp(5) {
             self.i32_data.entry("shape".to_string()).and_modify(|x| *x = (*x + 1) % 7).or_insert(0);
         }
+
         self.i32_data.entry("t".to_string()).and_modify(|x| *x += 1).or_insert(0);
     }
 }
