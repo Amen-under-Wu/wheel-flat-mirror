@@ -438,18 +438,22 @@ impl crate::WheelProgram for Cartridge {
             }
         }
         let mouse = wheel.get_mouse();
-        let mouse_x = 
-            if mouse.x > 0 && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32 {
+        let mut mouse_x = 
+            if mouse.x > (Self::BORDER_W * 2) as i32 && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32 {
                 mouse.x / 2 - Self::BORDER_W as i32
             } else {
                 -1
             };
-        let mouse_y = 
-            if mouse.y > 0 && mouse.y <= 2 * (Vram::SCREEN_HEIGHT + 2 * Self::BORDER_H) as i32 {
+        let mut mouse_y = 
+            if mouse.y > (Self::BORDER_H * 2) as i32 && mouse.y <= 2 * (Vram::SCREEN_HEIGHT + 2 * Self::BORDER_H) as i32 {
                 mouse.y / 2 - Self::BORDER_H as i32
             } else {
                 -1
             };
+        if mouse_x == -1 || mouse_y == -1 {
+            mouse_x = -1;
+            mouse_y = -1;
+        }
         self.context.poke(Ram::MOUSE_OFFSET, mouse_x as u8);
         self.context.poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
         const SCROLL_FACTOR: i32 = 50;
