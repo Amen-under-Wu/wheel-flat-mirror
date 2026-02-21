@@ -28,28 +28,6 @@ export function start_loop(test_func) {
 }
 window.start_loop = start_loop;
 
-async function playSquareWave() {
-    // 创建 AudioContext（需用户交互或在安全上下文中）
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-    // 创建振荡器
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = 'square'; // 设置为方波
-    oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 = 440 Hz
-
-    // 连接到输出
-    oscillator.connect(audioContext.destination);
-
-    // 启动并设定停止时间
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.3); // 播放 0.3 秒
-
-    // 可选：添加完成回调
-    oscillator.onended = () => {
-        console.log('方波播放结束');
-    };
-}
-
 export function main() {
     document.querySelector("button").remove();
     //playSquareWave();
