@@ -508,6 +508,109 @@ impl CartContext {
         }
     }
 
+    fn cross_mult(x1: f32, y1: f32, x2: f32, y2: f32, x0: f32, y0: f32) -> f32 {
+        (x2 - x1) * (y0 - y1) - (y2 - y1) * (x0 - x1)
+    }
+
+    pub fn tri(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, color: u8) {
+        let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32).min(self.clip_rect.0 + self.clip_rect.2 - 1);
+        let x_min = (x1.floor().min(x2.floor()).min(x3.floor()) as i32).max(self.clip_rect.0);
+        let y_max = (y1.ceil().max(y2.ceil()).max(y3.ceil()) as i32).min(self.clip_rect.1 + self.clip_rect.3 - 1);
+        let y_min = (y1.floor().min(y2.floor()).min(y3.floor()) as i32).max(self.clip_rect.1);
+        for y in y_min..=y_max {
+            for x in x_min..=x_max {
+                let cross1 = Self::cross_mult(x1, y1, x2, y2, x as f32, y as f32);
+                let cross2 = Self::cross_mult(x2, y2, x3, y3, x as f32, y as f32);
+                let cross3 = Self::cross_mult(x3, y3, x1, y1, x as f32, y as f32);
+                if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0) || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0) {
+                    self.set_pix(x, y, color);
+                }
+            }
+        }
+    }
+    pub fn trib(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, color: u8) {
+        self.line(x1, y1, x2, y2, color);
+        self.line(x2, y2, x3, y3, color);
+        self.line(x3, y3, x1, y1, color);
+    }
+
+    // the following 2 functions are adapted from cpp macros;
+    // therefore they look messy
+    // original macros written in 2024.6.
+    fn get_tile_pix(&self, x: i32, y: i32) -> u8 {
+        if x >= 0 && y >= 0 && x < (Ram::CANVAS_W * Ram::TILE_W) as i32 && y < (Ram::CANVAS_H * Ram::TILE_H) as i32 {
+            let x = x as usize;
+            let y = y as usize;
+            self.peek4(Ram::TILES_OFFSET * 2 + (y / Ram::TILE_H * Ram::CANVAS_W + x / Ram::TILE_W) * Ram::TILE_BYTE_SIZE * 2 + (y % Ram::TILE_H * Ram::TILE_W + x % Ram::TILE_W))
+        } else {
+            255
+        }
+    }
+    fn get_map_pix(&self, x: i32, y: i32) -> u8 {
+        if x >= 0 && y >= 0 && x < (Ram::MAP_W * Ram::TILE_W) as i32 && y < (Ram::MAP_H * Ram::TILE_H) as i32 {
+            let x = x as usize;
+            let y = y as usize;
+            self.peek4(Ram::TILES_OFFSET * 2 + self.peek(Ram::MAP_OFFSET + ((y % (Ram::TILE_H * Ram::MAP_H) + (Ram::TILE_H * Ram::MAP_H)) % (Ram::TILE_H * Ram::MAP_H)) / Ram::TILE_H * Ram::MAP_W + (((x) % (Ram::MAP_W * Ram::TILE_W) + (Ram::MAP_W * Ram::TILE_W)) % (Ram::MAP_W * Ram::TILE_W)) / Ram::TILE_W) as usize * Ram::TILE_BYTE_SIZE * 2 + (((y) % Ram::TILE_H + Ram::TILE_H) % Ram::TILE_H) * Ram::TILE_W + (((x) % Ram::TILE_W + Ram::TILE_W) % Ram::TILE_W))
+        } else {
+            255
+        }
+    }
+    pub fn textri(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, u1: f32, v1: f32, u2: f32, v2: f32, u3: f32, v3: f32, use_map: bool, trans_color: u8) {
+        let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32).min(self.clip_rect.0 + self.clip_rect.2 - 1);
+        let x_min = (x1.floor().min(x2.floor()).min(x3.floor()) as i32).max(self.clip_rect.0);
+        let y_max = (y1.ceil().max(y2.ceil()).max(y3.ceil()) as i32).min(self.clip_rect.1 + self.clip_rect.3 - 1);
+        let y_min = (y1.floor().min(y2.floor()).min(y3.floor()) as i32).max(self.clip_rect.1);
+        let mat_inv: [[f32; 3]; 3] = [
+            [y3 - y2, y1 - y3, y2 - y1], 
+            [x2 - x3, x3 - x1, x1 - x2],
+            [x3 * y2 - x2 * y3, x1 * y3 - x3 * y1, x2 * y1 - x1 * y2]
+        ];
+        let dnm = x3 * y2 - x2 * y3 + x1 * y3 - x3 * y1 + x2 * y1 - x1 * y2;
+        let a = (u1 * mat_inv[0][0] + u2 * mat_inv[0][1] + u3 * mat_inv[0][2]) / dnm;
+        let b = (u1 * mat_inv[1][0] + u2 * mat_inv[1][1] + u3 * mat_inv[1][2]) / dnm;
+        let c = (u1 * mat_inv[2][0] + u2 * mat_inv[2][1] + u3 * mat_inv[2][2]) / dnm;
+        let d = (v1 * mat_inv[0][0] + v2 * mat_inv[0][1] + v3 * mat_inv[0][2]) / dnm;
+        let e = (v1 * mat_inv[1][0] + v2 * mat_inv[1][1] + v3 * mat_inv[1][2]) / dnm;
+        let f = (v1 * mat_inv[2][0] + v2 * mat_inv[2][1] + v3 * mat_inv[2][2]) / dnm;
+        if use_map {
+            for y in y_min..=y_max {
+                let y = y as f32;
+                for x in x_min..=x_max {
+                    let x = x as f32;
+                    let cross1 = Self::cross_mult(x1, y1, x2, y2, x, y);
+                    let cross2 = Self::cross_mult(x2, y2, x3, y3, x, y);
+                    let cross3 = Self::cross_mult(x3, y3, x1, y1, x, y);
+                    if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0) || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0) {
+                        let u = (a * x + b * y + c).round() as i32;
+                        let v = (d * x + e * y + f).round() as i32;
+                        let color = self.get_map_pix(u, v);
+                        if color != trans_color {
+                            self.set_pix(x as i32, y as i32, color);
+                        }
+                    }
+                }
+            }
+        } else {
+            for y in y_min..=y_max {
+                let y = y as f32;
+                for x in x_min..=x_max {
+                    let x = x as f32;
+                    let cross1 = Self::cross_mult(x1, y1, x2, y2, x, y);
+                    let cross2 = Self::cross_mult(x2, y2, x3, y3, x, y);
+                    let cross3 = Self::cross_mult(x3, y3, x1, y1, x, y);
+                    if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0) || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0) {
+                        let u = (a * x + b * y + c).round() as i32;
+                        let v = (d * x + e * y + f).round() as i32;
+                        let color = self.get_tile_pix(u, v);
+                        if color != trans_color {
+                            self.set_pix(x as i32, y as i32, color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // inputs
 
     pub fn btn(&self, id: u8) -> bool {

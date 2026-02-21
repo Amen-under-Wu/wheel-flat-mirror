@@ -164,6 +164,10 @@ impl cartridge::CartProgram for Program {
                 4 => { context.elli(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
                 5 => { context.ellib(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
                 6 => { context.line(x0 as f32, y0 as f32, x as f32, y as f32, color); }, 
+                7 => { context.tri(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, color); },
+                8 => { context.trib(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, color); },
+                9 => { context.textri(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, 0.0, 0.0, 32.0, 0.0, 0.0, 32.0, false, 0); },
+                10 => { context.textri(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, 0.0, 0.0, 32.0, 0.0, 0.0, 32.0, true, 0); },
                 _ => (),
             }
         } else {
@@ -174,7 +178,7 @@ impl cartridge::CartProgram for Program {
             self.i32_data.entry("color".to_string()).and_modify(|x| *x = (*x + 1) % 16).or_insert(0);
         }
         if context.btnp(5) {
-            self.i32_data.entry("shape".to_string()).and_modify(|x| *x = (*x + 1) % 7).or_insert(0);
+            self.i32_data.entry("shape".to_string()).and_modify(|x| *x = (*x + 1) % 11).or_insert(0);
         }
 
         self.i32_data.entry("t".to_string()).and_modify(|x| *x += 1).or_insert(0);
