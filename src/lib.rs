@@ -124,11 +124,13 @@ impl cartridge::CartProgram for Program {
         self.i32_data.insert("sy".to_string(), 24);
         self.i32_data.insert("shape".to_string(), 0);
         self.i32_data.insert("color".to_string(), 1);
+        context.poke(0x4000, 0x22);
+        context.poke(0x8000, 1);
     }
     fn update(&mut self, context: &mut cartridge::CartContext) {
         context.cls(13);
+        context.map(1, 1, 10, 10, 0, 0, 255, 1);
         context.print("Hello World!", 84, 84, 0, false, 2, false);
-        context.print(&context.peek(0xff80).to_string(), 0, 0, 0, false, 1, false);
         if context.btn(0) {
             web_sys::console::log_1(&"up".into());
             self.i32_data.entry("sy".to_string()).and_modify(|y| *y -= 1).or_insert(24);

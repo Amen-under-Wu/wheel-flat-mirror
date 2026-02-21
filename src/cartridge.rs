@@ -447,7 +447,10 @@ impl CartContext {
     }
     pub fn spr(&mut self, id: i32, x: i32, y: i32, trans_color: u8, scale: i32, flip: i32, rotate: i32, w: i32, h: i32) {
         const N: i32 = (Ram::CANVAS_W * Ram::CANVAS_H) as i32;
-        let id = (id.clamp(0, N) % N) as usize;
+        if id < 0 || id > N * 2 || w <= 0 || h <= 0 {
+            return;
+        }
+        let id = id as usize;
         let flip = (flip.clamp(0, 4) % 4) as u8;
         let rotate = (rotate.clamp(0, 4) % 4) as u8;
         let w = w.min((Ram::CANVAS_W - id % Ram::CANVAS_W) as i32);
@@ -469,6 +472,39 @@ impl CartContext {
                     _ => (),
                 } 
             }
+        }
+    }
+    pub fn fget(&self, id: i32, flag_index: i32) -> bool {
+        if id >= 0 && id < 512 && flag_index >= 0 && flag_index < 8 {
+            self.peek1(Ram::SPRITE_FLAGS_OFFSET * 8 + id as usize * 8 + flag_index as usize) == 1
+        } else {
+            false
+        }
+    }
+    pub fn fset(&mut self, id: i32, flag_index: i32, value: bool) {
+        if id >= 0 && id < 512 && flag_index >= 0 && flag_index < 8 {
+            self.poke1(Ram::SPRITE_FLAGS_OFFSET * 8 + id as usize * 8 + flag_index as usize, if value { 1 } else { 0 });
+        }
+    }
+
+    pub fn mget(&self, x: i32, y: i32) -> i32 {
+        if x >= 0 && y >= 0 && x < Ram::MAP_W as i32 && y < Ram::MAP_H as i32 {
+            self.peek(Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize).into()
+        } else {
+            -1
+        }
+    }
+    pub fn mset(&mut self, x: i32, y: i32, tile_id: u8) {
+        if x >= 0 && y >= 0 && x < Ram::MAP_W as i32 && y < Ram::MAP_H as i32 {
+            self.poke(Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize, tile_id);
+        }
+    }
+    pub fn map(&mut self, x: i32, y: i32, w: i32, h: i32, sx: i32, sy: i32, trans_color: u8, scale: i32) {
+        // remap param to be added when wrapping to lua, not here
+        for i in 0..h {
+            for j in 0..w {
+                self.spr(self.mget(sx + j, sy + i), x + j * Ram::TILE_W as i32 * scale, y + i * Ram::TILE_H as i32 * scale, trans_color, scale, 0, 0, 1, 1);
+            } // maybe too much boundary checks?
         }
     }
 

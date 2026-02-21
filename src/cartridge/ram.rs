@@ -84,8 +84,8 @@ impl Ram {
     pub const SPRITE_BYTE_SIZE: usize = Self::SPRITE_W * Self::SPRITE_H * Self::BPP / 8;
     const SPRITES_BYTE_SIZE: usize = Self::SPRITES_N * Self::SPRITE_BYTE_SIZE;
     pub const MAP_OFFSET: usize = Self::SPRITES_OFFSET + Self::SPRITES_BYTE_SIZE;
-    const MAP_W: usize = 240;
-    const MAP_H: usize = 136;
+    pub const MAP_W: usize = 240;
+    pub const MAP_H: usize = 136;
     const MAP_TILE_BYTE_SIZE: usize = 1;
     const MAP_BYTE_SIZE: usize = Self::MAP_W * Self::MAP_H * Self::MAP_TILE_BYTE_SIZE;
     pub const GAMEPADS_OFFSET: usize = Self::MAP_OFFSET + Self::MAP_BYTE_SIZE;
