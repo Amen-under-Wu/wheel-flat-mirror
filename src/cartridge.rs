@@ -815,10 +815,9 @@ impl crate::WheelProgram for Cartridge {
         self.context.poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
         self.context.poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
 
-        self.program.update(&mut self.context);
-
         // draw screen
         self.context.ram[self.context.active_bank].set_active_vbank(0);
+        self.program.update(&mut self.context);
         for i in 0..Self::BORDER_H {
             self.program.scanline(&mut self.context, i);
             let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
