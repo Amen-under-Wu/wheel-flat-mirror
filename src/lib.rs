@@ -174,6 +174,9 @@ impl cartridge::CartProgram for Program {
             *self.i32_data.get_mut("y").unwrap() = -1;
         }
         context.putchar_ch_7px('轮', 20, 20, 13);
+        context.putchar_ch_16px('轮', 30, 20, 13);
+        context.print("wheel", 30, 30, 13, false, 1, false);
+        context.print("wheel", 30, 38, 13, false, 1, true);
         if context.btnp_with_hold_period(4, 60, 10) || context.keyp_with_hold_period(2, 60, 10) {
             self.i32_data.entry("color".to_string()).and_modify(|x| *x = (*x + 1) % 16).or_insert(0);
         }

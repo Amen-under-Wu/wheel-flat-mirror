@@ -34,6 +34,9 @@ pub fn tic80_font() -> (Vec<u8>, Vec<u8>) {
     )
 }
 
-pub fn ch_font() -> Vec<u8> {
-    include_bytes!("../data/font7px.bin").to_vec()
+pub fn ch_font() -> (Vec<u8>, Vec<u8>) {
+    (
+        include_bytes!("../data/font16px.bin").to_vec(), 
+        include_bytes!("../data/font7px.bin").to_vec()
+    )
 }
