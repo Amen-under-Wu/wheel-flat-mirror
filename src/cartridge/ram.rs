@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use crate::cartridge::pix_mask::PixMask;
 
 pub struct Vram {
     vbanks: [[u8; Self::SIZE]; Self::VBANK_N],
     active_vbank: usize,
-    subpixels: HashMap<(usize, usize), [u8; 4]>,
+    subpixels: PixMask,
 }
 
 impl Vram {
@@ -41,7 +41,7 @@ impl Vram {
         Self {
             vbanks,
             active_vbank: 0,
-            subpixels: HashMap::new(),
+            subpixels: PixMask::new(Self::SCREEN_WIDTH * Self::SCREEN_HEIGHT),
         }
     }
     pub fn set_active_bank(&mut self, bank: usize) {
@@ -155,7 +155,7 @@ impl Ram {
     pub fn set_active_vbank(&mut self, id: usize) {
         self.vram.set_active_bank(id);
     }
-    pub fn get_subpixels_mut(&mut self) -> &mut HashMap<(usize, usize), [u8; 4]> {
+    pub fn get_subpixels_mut(&mut self) -> &mut PixMask {
         &mut self.vram.subpixels
     }
 }

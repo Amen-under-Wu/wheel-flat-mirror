@@ -1,5 +1,7 @@
 pub mod ram;
+pub mod pix_mask;
 use crate::cartridge::ram::{Vram, Ram};
+use crate::cartridge::pix_mask::PixMask;
 use std::collections::HashMap;
 
 pub struct CartContext {
@@ -24,7 +26,7 @@ impl CartContext {
         }
     }
 
-    fn get_subpix_map_mut(&mut self) -> &mut HashMap<(usize, usize), [u8; 4]> {
+    fn get_subpix_map_mut(&mut self) -> &mut PixMask {
         self.ram[self.active_bank].get_subpixels_mut()
     }
 
@@ -128,7 +130,7 @@ impl CartContext {
                     break;
                 }
                 self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
-                self.get_subpix_map_mut().remove(&(x as usize, y as usize));
+                self.get_subpix_map_mut().del(x as usize, y as usize);
             }
         }
     }
@@ -136,7 +138,7 @@ impl CartContext {
     pub fn set_pix(&mut self, x: i32, y: i32, color: u8) {
         if self.in_clip(x, y) && color < 16 {
             self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
-            self.get_subpix_map_mut().remove(&(x as usize, y as usize));
+            self.get_subpix_map_mut().del(x as usize, y as usize);
         }
     }
     pub fn get_pix(&mut self, x: i32, y: i32) -> u8 {
@@ -628,8 +630,7 @@ impl CartContext {
                 if ((line_data >> j) & 1) != 0 {
                     let pix = Self::subpix_2_pix(x * 2 + j as i32, y * 2 + i as i32);
                     if self.in_clip(pix.0, pix.1) {
-                        let subpix = self.get_subpix_map_mut().entry((pix.0 as usize, pix.1 as usize)).or_insert([255; 4]);
-                        subpix[pix.2] = color;
+                        self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
                     }
                 }
             }
@@ -835,7 +836,7 @@ impl crate::WheelProgram for Cartridge {
                 let color = palette[self.context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
                 let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                 draw_fat_pixel(wheel, x, y, color);
-                let subpix = self.context.get_subpix_map_mut().get(&(xx, i));
+                let subpix = self.context.get_subpix_map_mut().get(xx, i);
                 if let Some(arr) = subpix {
                     let mut colors = [0; 4];
                     for j in 0..4 {
@@ -874,7 +875,7 @@ impl crate::WheelProgram for Cartridge {
                     let color = palette[color_id as usize];
                     let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                     draw_fat_pixel(wheel, x, y, color);
-                    let subpix = self.context.get_subpix_map_mut().get(&(xx, i));
+                    let subpix = self.context.get_subpix_map_mut().get(xx, i);
                     if let Some(arr) = subpix {
                         let mut colors = [0; 4];
                         for j in 0..4 {
