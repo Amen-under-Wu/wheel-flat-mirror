@@ -1,27 +1,31 @@
 pub mod ram;
 use crate::cartridge::ram::{Vram, Ram};
-use std::collections::{HashSet, HashMap};
+use std::collections::HashMap;
 
 pub struct CartContext {
     ram: Vec<Ram>,
     active_bank: usize,
     clip_rect: (i32, i32, i32, i32),
-    trans_map: HashSet<(i32, i32)>,
     key_timer: HashMap<u8, u32>,
     btn_timer: [i32; 32],
+    ch_font: (Vec<u16>, Vec<u8>),
 }
 
 impl CartContext {
     const BANK_N: usize = 8;
     pub fn new() -> Self {
         Self {
-            ram: vec![Ram::new(); Self::BANK_N],
+            ram: std::iter::repeat_with(|| Ram::new()).take(Self::BANK_N).collect(),
             active_bank: 0,
             clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
-            trans_map: HashSet::new(),
             key_timer: HashMap::new(),
             btn_timer: [0; 32],
+            ch_font: (Vec::new(), crate::data::ch_font()),
         }
+    }
+
+    fn get_subpix_map_mut(&mut self) -> &mut HashMap<(usize, usize), [u8; 4]> {
+        self.ram[self.active_bank].get_subpixels_mut()
     }
 
     // memory manipulations
@@ -124,6 +128,7 @@ impl CartContext {
                     break;
                 }
                 self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+                self.get_subpix_map_mut().remove(&(x as usize, y as usize));
             }
         }
     }
@@ -131,6 +136,7 @@ impl CartContext {
     pub fn set_pix(&mut self, x: i32, y: i32, color: u8) {
         if self.in_clip(x, y) && color < 16 {
             self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+            self.get_subpix_map_mut().remove(&(x as usize, y as usize));
         }
     }
     pub fn get_pix(&mut self, x: i32, y: i32) -> u8 {
@@ -611,6 +617,26 @@ impl CartContext {
         }
     }
 
+    fn subpix_2_pix(x: i32, y: i32) -> (i32, i32, usize) {
+        (x / 2, y / 2, ((y % 2) * 2 + x % 2) as usize)
+    }
+    pub fn putchar_ch_7px(&mut self, chr: char, x: i32, y: i32, color: u8) -> i32 {
+        let offset = (chr as usize - '一' as usize) * 8;
+        for i in 0..8 {
+            let line_data = self.ch_font.1[offset + i];
+            for j in 0..7 {
+                if ((line_data >> j) & 1) != 0 {
+                    let pix = Self::subpix_2_pix(x * 2 + j as i32, y * 2 + i as i32);
+                    if self.in_clip(pix.0, pix.1) {
+                        let subpix = self.get_subpix_map_mut().entry((pix.0 as usize, pix.1 as usize)).or_insert([255; 4]);
+                        subpix[pix.2] = color;
+                    }
+                }
+            }
+        }
+        4
+    }
+
     // inputs
 
     pub fn btn(&self, id: u8) -> bool {
@@ -699,6 +725,21 @@ fn draw_fat_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, color: 
     wheel.draw_pixel(x * 2 + 1, y * 2 + 1, color);
 }
 
+fn draw_sub_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, data: [u32; 4]) {
+    if data[0] <= 0xFFFFFF {
+        wheel.draw_pixel(x * 2, y * 2, data[0]);
+    }
+    if data[1] <= 0xFFFFFF {
+        wheel.draw_pixel(x * 2 + 1, y * 2, data[1]);
+    }
+    if data[2] <= 0xFFFFFF {
+        wheel.draw_pixel(x * 2, y * 2 + 1, data[2]);
+    }
+    if data[3] <= 0xFFFFFF {
+        wheel.draw_pixel(x * 2 + 1, y * 2 + 1, data[3]);
+    }
+}
+
 impl crate::WheelProgram for Cartridge {
     fn init(&mut self, _wheel: &mut dyn crate::WheelInterface) {
         self.program.init(&mut self.context);
@@ -777,26 +818,6 @@ impl crate::WheelProgram for Cartridge {
         self.program.update(&mut self.context);
 
         // draw screen
-        self.context.ram[self.context.active_bank].set_active_vbank(1);
-        self.program.overlay(&mut self.context);
-        self.context.trans_map.clear();
-        let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
-        let trans_color = self.context.peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
-        let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
-        let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
-        for i in 0..Vram::SCREEN_HEIGHT{
-            let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
-            for xx in 0..Vram::SCREEN_WIDTH {
-                let color_id = self.context.peek4(i * Vram::SCREEN_WIDTH + xx);
-                if color_id != trans_color {
-                    let color = palette[color_id as usize];
-                    let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
-                    draw_fat_pixel(wheel, x, y, color);
-                    self.context.trans_map.insert((xx as i32, i as i32));
-                }
-            }
-        }
-
         self.context.ram[self.context.active_bank].set_active_vbank(0);
         for i in 0..Self::BORDER_H {
             self.program.scanline(&mut self.context, i);
@@ -814,8 +835,14 @@ impl crate::WheelProgram for Cartridge {
             for xx in 0..Vram::SCREEN_WIDTH {
                 let color = palette[self.context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
                 let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
-                if !self.context.trans_map.contains(&(xx as i32, i as i32)) {
-                    draw_fat_pixel(wheel, x, y, color);
+                draw_fat_pixel(wheel, x, y, color);
+                let subpix = self.context.get_subpix_map_mut().get(&(xx, i));
+                if let Some(arr) = subpix {
+                    let mut colors = [0; 4];
+                    for j in 0..4 {
+                        colors[j] = if arr[j] < 16 { palette[arr[j] as usize] } else { 0xFFFFFFFF };
+                    }
+                    draw_sub_pixel(wheel, x, y, colors);
                 }
             }
             let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
@@ -831,6 +858,32 @@ impl crate::WheelProgram for Cartridge {
             let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
             for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
                 draw_fat_pixel(wheel, x, ii as i32, color);
+            }
+        }
+
+        self.context.ram[self.context.active_bank].set_active_vbank(1);
+        self.program.overlay(&mut self.context);
+        let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
+        let trans_color = self.context.peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
+        let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
+        let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
+        for i in 0..Vram::SCREEN_HEIGHT{
+            let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
+            for xx in 0..Vram::SCREEN_WIDTH {
+                let color_id = self.context.peek4(i * Vram::SCREEN_WIDTH + xx);
+                if color_id != trans_color {
+                    let color = palette[color_id as usize];
+                    let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
+                    draw_fat_pixel(wheel, x, y, color);
+                    let subpix = self.context.get_subpix_map_mut().get(&(xx, i));
+                    if let Some(arr) = subpix {
+                        let mut colors = [0; 4];
+                        for j in 0..4 {
+                            colors[j] = if arr[j] < 16 { palette[arr[j] as usize] } else { 0xFFFFFFFF };
+                        }
+                        draw_sub_pixel(wheel, x, y, colors);
+                    }
+                }
             }
         }
 

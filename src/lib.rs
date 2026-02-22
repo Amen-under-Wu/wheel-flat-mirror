@@ -132,7 +132,6 @@ impl cartridge::CartProgram for Program {
         context.map(1, 1, 10, 10, 0, 0, 255, 1);
         context.print("Hello World!", 84, 84, 0, false, 2, false);
         if context.btn(0) {
-            web_sys::console::log_1(&"up".into());
             self.i32_data.entry("sy".to_string()).and_modify(|y| *y -= 1).or_insert(24);
         }
         if context.btn(1) {
@@ -174,6 +173,7 @@ impl cartridge::CartProgram for Program {
             *self.i32_data.get_mut("x").unwrap() = -1;
             *self.i32_data.get_mut("y").unwrap() = -1;
         }
+        context.putchar_ch_7px('轮', 20, 20, 13);
         if context.btnp_with_hold_period(4, 60, 10) || context.keyp_with_hold_period(2, 60, 10) {
             self.i32_data.entry("color".to_string()).and_modify(|x| *x = (*x + 1) % 16).or_insert(0);
         }
