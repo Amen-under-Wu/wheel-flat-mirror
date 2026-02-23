@@ -173,8 +173,10 @@ impl cartridge::CartProgram for Program {
             *self.i32_data.get_mut("x").unwrap() = -1;
             *self.i32_data.get_mut("y").unwrap() = -1;
         }
-        context.putchar_ch_7px('轮', 20, 20, 13);
-        context.putchar_ch_16px('轮', 30, 20, 13);
+        context.putchar_ch_7px('轮', 20, 20, 13, 1);
+        context.putchar_ch_16px('轮', 30, 20, 13, 1);
+        context.putchar_ch_7px('轮', 0, 100, 1, 2);
+        context.putchar_ch_16px('轮', 30, 100, 1, 3);
         context.print("wheel", 30, 30, 13, false, 1, false);
         context.print("wheel", 30, 38, 13, false, 1, true);
         if context.btnp_with_hold_period(4, 60, 10) || context.keyp_with_hold_period(2, 60, 10) {

@@ -622,42 +622,56 @@ impl CartContext {
     fn subpix_2_pix(x: i32, y: i32) -> (i32, i32, usize) {
         (x / 2, y / 2, ((y % 2) * 2 + x % 2) as usize)
     }
-    pub fn putchar_ch_7px(&mut self, chr: char, x: i32, y: i32, color: u8) {
+    pub fn putchar_ch_7px(&mut self, chr: char, x: i32, y: i32, color: u8, scale: i32) -> i32 {
         let offset = (chr as usize - '一' as usize) * 8;
         for i in 0..8 {
             let line_data = self.ch_font.1[offset + i];
             for j in 0..8 {
                 if ((line_data >> j) & 1) != 0 {
-                    let pix = Self::subpix_2_pix(x * 2 + j as i32, y * 2 + i as i32);
-                    if self.in_clip(pix.0, pix.1) {
-                        self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                    for k in 0..scale {
+                        for l in 0..scale {
+                            let pix = Self::subpix_2_pix(x * 2 + j as i32 * scale + k, y * 2 + i as i32 * scale + l);
+                            if self.in_clip(pix.0, pix.1) {
+                                self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                            }
+                        }
                     }
                 }
             }
         }
+        scale * 4
     }
-    pub fn putchar_ch_16px(&mut self, chr: char, x: i32, y: i32, color: u8) {
+    pub fn putchar_ch_16px(&mut self, chr: char, x: i32, y: i32, color: u8, scale: i32) -> i32 {
         let offset = (chr as usize - '一' as usize) * 32;
         for i in 0..16 {
             let line_data = self.ch_font.0[offset + i * 2];
             for j in 0..8 {
                 if ((line_data >> j) & 1) != 0 {
-                    let pix = Self::subpix_2_pix(x * 2 + j as i32, y * 2 + i as i32);
-                    if self.in_clip(pix.0, pix.1) {
-                        self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                    for k in 0..scale {
+                        for l in 0..scale {
+                            let pix = Self::subpix_2_pix(x * 2 + j as i32 * scale + k, y * 2 + i as i32 * scale + l);
+                            if self.in_clip(pix.0, pix.1) {
+                                self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                            }
+                        }
                     }
                 }
             }
             let line_data = self.ch_font.0[offset + i * 2 + 1];
             for j in 0..8 {
                 if ((line_data >> j) & 1) != 0 {
-                    let pix = Self::subpix_2_pix(x * 2 + 8 + j as i32, y * 2 + i as i32);
-                    if self.in_clip(pix.0, pix.1) {
-                        self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                    for k in 0..scale {
+                        for l in 0..scale {
+                            let pix = Self::subpix_2_pix(x * 2 + (j + 8) as i32 * scale + k, y * 2 + i as i32 * scale + l);
+                            if self.in_clip(pix.0, pix.1) {
+                                self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                            }
+                        }
                     }
                 }
             }
         }
+        scale * 8
     }
 
     // inputs
