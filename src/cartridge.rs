@@ -622,26 +622,20 @@ impl CartContext {
     fn subpix_2_pix(x: i32, y: i32) -> (i32, i32, usize) {
         (x / 2, y / 2, ((y % 2) * 2 + x % 2) as usize)
     }
-    pub fn putchar_ch_7px(&mut self, chr: char, x: i32, y: i32, color: u8, scale: i32) -> i32 {
+    fn putchar_ch_7px(&mut self, chr: char, x: i32, y: i32, color: u8, scale: i32) -> i32 {
+        // better without upscaling
         let offset = (chr as usize - '一' as usize) * 8;
         for i in 0..8 {
             let line_data = self.ch_font.1[offset + i];
             for j in 0..8 {
                 if ((line_data >> j) & 1) != 0 {
-                    for k in 0..scale {
-                        for l in 0..scale {
-                            let pix = Self::subpix_2_pix(x * 2 + j as i32 * scale + k, y * 2 + i as i32 * scale + l);
-                            if self.in_clip(pix.0, pix.1) {
-                                self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
-                            }
-                        }
-                    }
+                    self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
                 }
             }
         }
-        scale * 4
+        scale * 8
     }
-    pub fn putchar_ch_16px(&mut self, chr: char, x: i32, y: i32, color: u8, scale: i32) -> i32 {
+    fn putchar_ch_16px(&mut self, chr: char, x: i32, y: i32, color: u8, scale: i32) -> i32 {
         let offset = (chr as usize - '一' as usize) * 32;
         for i in 0..16 {
             let line_data = self.ch_font.0[offset + i * 2];
@@ -671,8 +665,36 @@ impl CartContext {
                 }
             }
         }
-        scale * 8
+        scale * 8 + 1
     }
+    pub fn print_ch(&mut self, text: &str, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
+        let mut text_width = 0;
+        let mut x_offset = 0;
+        let mut y = y;
+        let chr_height_en: i32 = scale * self.peek((if alt_font { Ram::ALT_FONT_OFFSET } else { Ram::SYSTEM_FONT_OFFSET }) + Ram::FONT_PARAM_OFFSET_RELATIVE + 1) as i32;
+        let chr_height: i32 = scale * 8;
+        for chr in text.chars() {
+            let chr = chr as u32;
+            if chr == '\n' as u32 {
+                text_width = text_width.max(x_offset);
+                x_offset = 0;
+                y += chr_height;
+            } else {
+                if chr >= '一' as u32 && chr <= '龥' as u32 {
+                    if alt_font {
+                        x_offset += self.putchar_ch_7px(char::from_u32(chr).unwrap_or('㗊'), x + x_offset, y, color, scale);
+                    } else {
+                        x_offset += self.putchar_ch_16px(char::from_u32(chr).unwrap_or('㗊'), x + x_offset, y, color, scale);
+                    }
+                } else {
+                    let y = y - (chr_height_en - chr_height);
+                    x_offset += self.putchar(chr.clamp(0, 128) as u8, x + x_offset, y, color, is_fixed, scale, alt_font);
+                }
+            }
+        }
+        text_width.max(x_offset)
+    }
+
 
     // inputs
 
