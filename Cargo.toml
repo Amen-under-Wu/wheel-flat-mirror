@@ -3,6 +3,9 @@ name = "wheel-flat"
 version = "0.1.0"
 edition = "2024"
 authors = ["Amen-under-Wu <yh_fengovsky@qq.com>"]
+description = "A fantasy console imitating TIC-80, implemented in Rust and WebAssembly."
+repository = "https://git.tsinghua.edu.cn/pair/wheelflat"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib"]
