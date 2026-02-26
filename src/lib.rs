@@ -1,10 +1,11 @@
 mod io_device;
 mod cartridge;
 mod data;
+mod system;
+
 use crate::io_device::{graphics_device, audio_device, input_device};
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
-use rand::Rng;
 
 struct WheelContext {
     screen: Box<dyn graphics_device::Display>,
@@ -101,21 +102,19 @@ pub trait WheelProgram {
 
 use std::collections::HashMap;
 
-struct Program {
-    rng: rand::rngs::ThreadRng,
+struct DemoProgram {
     i32_data: HashMap<String, i32>,
 }
 
-impl Program {
+impl DemoProgram {
     fn new() -> Self {
         Self {
-            rng: rand::thread_rng(),
             i32_data: HashMap::new(),
         }
     }
 }
 
-impl cartridge::CartProgram for Program {
+impl cartridge::CartProgram for DemoProgram {
     fn init(&mut self, context: &mut cartridge::CartContext) {
         self.i32_data.insert("t".to_string(), 0);
         self.i32_data.insert("x".to_string(), 0);
@@ -132,6 +131,8 @@ impl cartridge::CartProgram for Program {
         context.map(1, 1, 10, 10, 0, 0, 255, 1);
         context.print_ch("你好wheel flat轮扁!", 84, 84, 0, false, 1, false);
         context.print_ch("你好wheel flat轮扁!", 84, 94, 0, false, 1, true);
+        context.print_ch("按esc回到终端", 84, 104, 0, false, 1, false);
+        //context.print_ch("镧铈镨钕钷钐铕钆铽镝钬铒铥镱镥", 84, 104, 0, false, 1, true);
         if context.btn(0) {
             self.i32_data.entry("sy".to_string()).and_modify(|y| *y -= 1).or_insert(24);
         }
@@ -196,7 +197,7 @@ struct Wheel {
 impl Wheel {
     pub fn new(audio_context: web_sys::AudioContext) -> Self {
         let mut context = WheelContext::new(audio_context);
-        let mut program = cartridge::Cartridge::new(Box::new(Program::new()));
+        let mut program = cartridge::Cartridge::new(Box::new(crate::system::Console::new(Box::new(DemoProgram::new()))));
         program.init(&mut context);
         Self {
             context,

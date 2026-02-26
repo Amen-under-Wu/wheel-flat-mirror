@@ -156,6 +156,7 @@ impl CartContext {
         for yy in y..y + h {
             for xx in x..x + w {
                 self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
+                self.get_subpix_map_mut().del(xx as usize, yy as usize);
             }
         }
     }
