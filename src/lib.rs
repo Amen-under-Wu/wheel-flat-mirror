@@ -6,6 +6,8 @@ mod system;
 use crate::io_device::{graphics_device, audio_device, input_device};
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 struct WheelContext {
     screen: Box<dyn graphics_device::Display>,
@@ -114,8 +116,8 @@ impl DemoProgram {
     }
 }
 
-impl cartridge::CartProgram for DemoProgram {
-    fn init(&mut self, context: &mut cartridge::CartContext) {
+impl system::SystemProgram for DemoProgram {
+    fn init(&mut self, context: &mut cartridge::CartContext, sys_context: &mut system::SystemContext) {
         self.i32_data.insert("t".to_string(), 0);
         self.i32_data.insert("x".to_string(), 0);
         self.i32_data.insert("y".to_string(), 0);
@@ -125,8 +127,9 @@ impl cartridge::CartProgram for DemoProgram {
         self.i32_data.insert("color".to_string(), 1);
         context.poke(0x4000, 0x22);
         context.poke(0x8000, 1);
+        sys_context.trace("运行demo", 13);
     }
-    fn update(&mut self, context: &mut cartridge::CartContext) {
+    fn update(&mut self, context: &mut cartridge::CartContext, sys_context: &mut system::SystemContext) {
         context.cls(13);
         context.map(1, 1, 10, 10, 0, 0, 255, 1);
         context.print_ch("你好wheel flat轮扁!", 84, 84, 0, false, 1, false);
@@ -182,6 +185,11 @@ impl cartridge::CartProgram for DemoProgram {
             self.i32_data.entry("shape".to_string()).and_modify(|x| *x = (*x + 1) % 11).or_insert(0);
         }
 
+        if context.keyp(Some(66)) {
+            sys_context.trace(&format!("运行时间：{} ms", sys_context.time()), 13);
+            sys_context.exit();
+        }
+
         self.i32_data.entry("t".to_string()).and_modify(|x| *x += 1).or_insert(0);
     }
 }
@@ -197,7 +205,7 @@ struct Wheel {
 impl Wheel {
     pub fn new(audio_context: web_sys::AudioContext) -> Self {
         let mut context = WheelContext::new(audio_context);
-        let mut program = cartridge::Cartridge::new(Box::new(crate::system::Console::new(Box::new(DemoProgram::new()))));
+        let mut program = cartridge::Cartridge::new(Box::new(system::WheelSystem::new(Rc::new(RefCell::new(DemoProgram::new())))));
         program.init(&mut context);
         Self {
             context,

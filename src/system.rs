@@ -1,56 +1,108 @@
-pub struct Console {
+use std::rc::Rc;
+use std::cell::RefCell;
+use js_sys::Date;
+
+pub struct SystemContext {
     lines: Vec<String>,
     input_buffer: String,
     cursor_pos: usize,
     top_line: usize,
-    demo: Box<dyn crate::cartridge::CartProgram>,
-    in_demo: bool,
+    program_timer: u64,
+    exit_flag: bool,
 }
 
-impl Console {
-    pub fn new(demo: Box<dyn crate::cartridge::CartProgram>) -> Self {
-        Console {
+impl SystemContext {
+    pub fn new() -> Self {
+        Self {
             lines: vec!["拓竹杯参赛作品 wheel flat 轮扁".to_string(), "输入 run 进入演示".to_string()],
             input_buffer: String::new(),
             cursor_pos: 0,
             top_line: 0,
+            program_timer: Date::now() as u64,
+            exit_flag: false,
+        }
+    }
+    pub fn exit(&mut self) {
+        self.exit_flag = true;
+    }
+    pub fn trace(&mut self, message: &str, _color: u8) {
+        self.lines.push(message.to_string());
+    }
+    pub fn reset(&mut self) {}
+    pub fn time(&self) -> u64 {
+        Date::now() as u64 - self.program_timer
+    }
+    pub fn tstamp(&self) -> u64 {
+        Date::now() as u64
+    }
+}
+
+pub trait SystemProgram {
+    fn init(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext) {}
+    fn update(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext) {}
+    fn scanline(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext, i: i32) {}
+    fn overlay(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext) {}
+}
+
+pub struct WheelSystem {
+    context: SystemContext,
+    demo: Rc<RefCell<dyn SystemProgram>>,
+    program: Option<Rc<RefCell<dyn SystemProgram>>>,
+}
+
+impl WheelSystem {
+    pub fn new(demo: Rc<RefCell<dyn SystemProgram>>) -> Self {
+        Self {
+            context: SystemContext::new(),
             demo,
-            in_demo: false,
+            program: None,
         }
     }
 }
 
-impl crate::cartridge::CartProgram for Console {
+impl crate::cartridge::CartProgram for WheelSystem {
     fn update(&mut self, context: &mut crate::cartridge::CartContext) {
-        if self.in_demo {
-            self.demo.update(context);
-            if context.keyp(Some(66)) {
-                self.in_demo = false;
+        if let Some(program) = &self.program {
+            program.borrow_mut().update(context, &mut self.context);
+            if self.context.exit_flag {
+                self.program = None;
+                self.context.exit_flag = false;
             }
             return;
         }
         context.cls(0);
-        for i in self.top_line..self.lines.len() {
-            context.print_ch(&self.lines[i], 0, (i - self.top_line) as i32 * 9, 13, true, 1, false);
+        for i in self.context.top_line..self.context.lines.len() {
+            context.print_ch(&self.context.lines[i], 0, (i - self.context.top_line) as i32 * 9, 13, true, 1, false);
         }
-        context.print_ch(&(">".to_string() + &self.input_buffer), 0, (self.lines.len() - self.top_line) as i32 * 9, 13, true, 1, false);
+        context.print_ch(&(">".to_string() + &self.context.input_buffer), 0, (self.context.lines.len() - self.context.top_line) as i32 * 9, 13, true, 1, false);
         for i in 1..26 {
             if context.keyp_with_hold_period(i, 60, 5) {
-                self.input_buffer.push((i - 1 + 'a' as u8) as char);
+                self.context.input_buffer.push((i - 1 + 'a' as u8) as char);
             }
         }
         if context.keyp_with_hold_period(50, 60, 5) {
-            self.lines.push(">".to_string() + &self.input_buffer);
-            if self.input_buffer == "run" {
-                self.in_demo = true;
-                self.demo.init(context);
+            self.context.lines.push(">".to_string() + &self.context.input_buffer);
+            if self.context.input_buffer == "run" {
+                self.context.program_timer = Date::now() as u64;
+                self.demo.borrow_mut().init(context, &mut self.context);
+                self.program = Some(self.demo.clone());
             } else {
-                self.lines.push("未知命令".to_string());
+                self.context.lines.push("未知命令".to_string());
             }
-            self.input_buffer.clear();
+            self.context.input_buffer.clear();
         }
         if context.keyp_with_hold_period(51, 60, 5) {
-            self.input_buffer.pop();
+            self.context.input_buffer.pop();
+        }
+    }
+    fn scanline(&mut self, context: &mut crate::cartridge::CartContext, line_i: usize) {
+        if let Some(program) = &self.program {
+            program.borrow_mut().scanline(context, &mut self.context, line_i as i32);
+        }
+    }
+    fn overlay(&mut self, context: &mut crate::cartridge::CartContext) {
+        if let Some(program) = &self.program {
+            program.borrow_mut().overlay(context, &mut self.context);
         }
     }
 }
