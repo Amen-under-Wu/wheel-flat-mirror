@@ -33,7 +33,7 @@ impl SystemContext {
         Date::now() as u64 - self.program_timer
     }
     pub fn tstamp(&self) -> u64 {
-        Date::now() as u64
+        (Date::now() / 1000) as u64
     }
 }
 
