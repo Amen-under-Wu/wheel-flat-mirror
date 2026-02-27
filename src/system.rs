@@ -9,6 +9,7 @@ pub struct SystemContext {
     top_line: usize,
     program_timer: u64,
     exit_flag: bool,
+    capslock: bool,
 }
 
 impl SystemContext {
@@ -20,6 +21,7 @@ impl SystemContext {
             top_line: 0,
             program_timer: Date::now() as u64,
             exit_flag: false,
+            capslock: false,
         }
     }
     pub fn exit(&mut self) {
@@ -33,7 +35,7 @@ impl SystemContext {
         Date::now() as u64 - self.program_timer
     }
     pub fn tstamp(&self) -> u64 {
-        (Date::now() / 1000) as u64
+        (Date::now() / 1000.0) as u64
     }
 }
 
@@ -58,6 +60,42 @@ impl WheelSystem {
             program: None,
         }
     }
+    fn get_char(&self, context: &crate::cartridge::CartContext) -> Option<char> {
+        const KEYBOARD_OFFSET: usize = crate::cartridge::ram::Ram::KEYBOARD_OFFSET;
+        const NUM_SHIFTS: [char; 10] = [')', '!', '@', '#', '$', '%', '^', '&', '*', '('];
+        let keys: Vec<u8> = (0..4).map(|i| context.peek(KEYBOARD_OFFSET + i)).collect();
+        let shift = keys.contains(&64) || self.context.capslock;
+        for i in keys {
+            if context.keyp_with_hold_period(i, 60, 5) {
+                let c = match i {
+                    1..=26 => (i - 1 + if shift { b'A' } else { b'a' }) as char,
+                    27..=36 => if shift { NUM_SHIFTS[(i - 27) as usize] } else { (i - 27 + b'0') as char },
+                    37 => if shift { '_' } else { '-' },
+                    38 => if shift { '+' } else { '=' },
+                    39 => if shift { '{' } else { '[' },
+                    40 => if shift { '}' } else { ']' },
+                    41 => if shift { '|' } else { '\\' },
+                    42 => if shift { ':' } else { ';' },
+                    43 => if shift { '"' } else { '\'' },
+                    44 => if shift { '~' } else { '`' },
+                    45 => if shift { '<' } else { ',' },
+                    46 => if shift { '>' } else { '.' },
+                    47 => if shift { '?' } else { '/' },
+                    48 => ' ',
+                    49 => '\t',
+                    79..=88 => (i - 79 + b'0') as char,
+                    89 => '+',
+                    90 => '-',
+                    91 => '*',
+                    92 => '/',
+                    94 => '.',
+                    _ => continue,
+                };
+                return Some(c);
+            }
+        }
+        None
+    }
 }
 
 impl crate::cartridge::CartProgram for WheelSystem {
@@ -75,10 +113,11 @@ impl crate::cartridge::CartProgram for WheelSystem {
             context.print_ch(&self.context.lines[i], 0, (i - self.context.top_line) as i32 * 9, 13, true, 1, false);
         }
         context.print_ch(&(">".to_string() + &self.context.input_buffer), 0, (self.context.lines.len() - self.context.top_line) as i32 * 9, 13, true, 1, false);
-        for i in 1..26 {
-            if context.keyp_with_hold_period(i, 60, 5) {
-                self.context.input_buffer.push((i - 1 + 'a' as u8) as char);
-            }
+        if context.keyp(Some(62)) {
+            self.context.capslock = !self.context.capslock;
+        }
+        if let Some(c) = self.get_char(context) {
+            self.context.input_buffer.push(c);
         }
         if context.keyp_with_hold_period(50, 60, 5) {
             self.context.lines.push(">".to_string() + &self.context.input_buffer);
