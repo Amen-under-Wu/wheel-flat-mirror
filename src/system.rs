@@ -27,9 +27,30 @@ impl SystemContext {
     pub fn exit(&mut self) {
         self.exit_flag = true;
     }
-    pub fn trace(&mut self, message: &str, _color: u8) {
-        self.lines.push(message.to_string());
+
+    fn split_line(line: &str) -> Vec<String> {
+        let mut result = Vec::new();
+        let mut current_line = String::new();
+        let mut w = 0;
+        for c in line.chars() {
+            w = if c.is_ascii() { w + 6 } else { w + 9 };
+            if w >= 240 || c == '\n' {
+                result.push(current_line);
+                current_line = String::new();
+                w = 0;
+            }
+            current_line.push(c);
+        }
+        if !current_line.is_empty() {
+            result.push(current_line);
+        }
+        result
     }
+    pub fn trace(&mut self, message: &str, _color: u8) {
+        let new_lines = Self::split_line(message);
+        self.lines.extend(new_lines);
+    }
+
     pub fn reset(&mut self) {}
     pub fn time(&self) -> u64 {
         Date::now() as u64 - self.program_timer
@@ -37,6 +58,7 @@ impl SystemContext {
     pub fn tstamp(&self) -> u64 {
         (Date::now() / 1000.0) as u64
     }
+
 }
 
 pub trait SystemProgram {
@@ -112,7 +134,11 @@ impl crate::cartridge::CartProgram for WheelSystem {
         for i in self.context.top_line..self.context.lines.len() {
             context.print_ch(&self.context.lines[i], 0, (i - self.context.top_line) as i32 * 9, 13, true, 1, false);
         }
-        context.print_ch(&(">".to_string() + &self.context.input_buffer), 0, (self.context.lines.len() - self.context.top_line) as i32 * 9, 13, true, 1, false);
+        let input_lines = SystemContext::split_line(&(">".to_string() + &self.context.input_buffer));
+        for i in 0..input_lines.len() {
+            context.print_ch(&input_lines[i], 0, (self.context.lines.len() - self.context.top_line) as i32 * 9 + i as i32 * 9, 13, true, 1, false);
+        }
+        //context.print_ch(, 0, (self.context.lines.len() - self.context.top_line) as i32 * 9, 13, true, 1, false);
         if context.keyp(Some(62)) {
             self.context.capslock = !self.context.capslock;
         }
@@ -120,7 +146,7 @@ impl crate::cartridge::CartProgram for WheelSystem {
             self.context.input_buffer.push(c);
         }
         if context.keyp_with_hold_period(50, 60, 5) {
-            self.context.lines.push(">".to_string() + &self.context.input_buffer);
+            self.context.lines.extend(input_lines);
             if self.context.input_buffer == "run" {
                 self.context.program_timer = Date::now() as u64;
                 self.demo.borrow_mut().init(context, &mut self.context);
