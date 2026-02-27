@@ -313,6 +313,7 @@ impl CartContext {
         for y in self.clip_rect.1 .. self.clip_rect.1 + self.clip_rect.3 {
             for x in self.clip_rect.0 .. self.clip_rect.0 + self.clip_rect.2 {
                 self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+                self.get_subpix_map_mut().del(x as usize, y as usize);
             }
         }
     }

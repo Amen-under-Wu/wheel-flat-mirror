@@ -13,6 +13,7 @@ pub struct SystemContext {
 }
 
 impl SystemContext {
+    const MAX_LINES: usize = crate::cartridge::ram::Vram::SCREEN_HEIGHT / 9;
     pub fn new() -> Self {
         Self {
             lines: vec!["拓竹杯参赛作品 wheel flat 轮扁".to_string(), "输入 run 进入演示".to_string()],
@@ -46,6 +47,21 @@ impl SystemContext {
         }
         result
     }
+    fn line_count(line: &str) -> usize { // used for input only
+        let mut count = 0;
+        let mut w = 6; // start with 6 to account for the ">" prompt
+        for c in line.chars() {
+            w = if c.is_ascii() { w + 6 } else { w + 9 };
+            if w >= 240 || c == '\n' {
+                count += 1;
+                w = 0;
+            }
+        }
+        if w > 0 {
+            count += 1;
+        }
+        count
+    }
     pub fn trace(&mut self, message: &str, _color: u8) {
         let new_lines = Self::split_line(message);
         self.lines.extend(new_lines);
@@ -57,6 +73,19 @@ impl SystemContext {
     }
     pub fn tstamp(&self) -> u64 {
         (Date::now() / 1000.0) as u64
+    }
+
+    fn scroll(&mut self, lines: i32) {
+        let max_top = if self.lines.len() + Self::line_count(&self.input_buffer) > Self::MAX_LINES { self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES } else { 0 };
+        if lines > 0 {
+            self.top_line = (self.top_line + lines as usize).min(max_top);
+        } else {
+            self.top_line = self.top_line.saturating_sub((-lines) as usize);
+        }
+    }
+    fn scroll_to_bottom(&mut self) {
+        let max_top = if self.lines.len() + Self::line_count(&self.input_buffer)> Self::MAX_LINES { self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES } else { 0 };
+        self.top_line = max_top;
     }
 
 }
@@ -143,22 +172,37 @@ impl crate::cartridge::CartProgram for WheelSystem {
             self.context.capslock = !self.context.capslock;
         }
         if let Some(c) = self.get_char(context) {
+            self.context.scroll_to_bottom();
             self.context.input_buffer.push(c);
         }
         if context.keyp_with_hold_period(50, 60, 5) {
             self.context.lines.extend(input_lines);
-            if self.context.input_buffer == "run" {
-                self.context.program_timer = Date::now() as u64;
-                self.demo.borrow_mut().init(context, &mut self.context);
-                self.program = Some(self.demo.clone());
-            } else {
-                self.context.lines.push("未知命令".to_string());
+            match self.context.input_buffer.as_str() {
+                "" => {},
+                "clear" => self.context.lines.clear(),
+                "cls" => self.context.lines.clear(),
+                "run" => {
+                    self.context.program_timer = Date::now() as u64;
+                    self.demo.borrow_mut().init(context, &mut self.context);
+                    self.program = Some(self.demo.clone());
+                },
+                _ => {
+                    self.context.lines.push("未知命令".to_string());
+                },
             }
             self.context.input_buffer.clear();
+            self.context.scroll_to_bottom();
         }
         if context.keyp_with_hold_period(51, 60, 5) {
             self.context.input_buffer.pop();
         }
+        let (_, _, _, _, _, _, sy) = context.mouse();
+        if sy > 0 {
+            self.context.scroll(1);
+        } else if sy < 0 {
+            self.context.scroll(-1);
+        }
+
     }
     fn scanline(&mut self, context: &mut crate::cartridge::CartContext, line_i: usize) {
         if let Some(program) = &self.program {
