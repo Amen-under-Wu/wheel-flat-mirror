@@ -98,7 +98,7 @@ pub trait SystemProgram {
 }
 
 pub struct WheelSystem {
-    context: SystemContext,
+    context: Rc<RefCell<SystemContext>>,
     demo: Rc<RefCell<dyn SystemProgram>>,
     program: Option<Rc<RefCell<dyn SystemProgram>>>,
 }
@@ -106,16 +106,16 @@ pub struct WheelSystem {
 impl WheelSystem {
     pub fn new(demo: Rc<RefCell<dyn SystemProgram>>) -> Self {
         Self {
-            context: SystemContext::new(),
+            context: Rc::new(RefCell::new(SystemContext::new())),
             demo,
             program: None,
         }
     }
-    fn get_char(&self, context: &crate::cartridge::CartContext) -> Option<char> {
+    fn get_char(&self, context: &crate::cartridge::CartContext, borrow: &SystemContext) -> Option<char> {
         const KEYBOARD_OFFSET: usize = crate::cartridge::ram::Ram::KEYBOARD_OFFSET;
         const NUM_SHIFTS: [char; 10] = [')', '!', '@', '#', '$', '%', '^', '&', '*', '('];
         let keys: Vec<u8> = (0..4).map(|i| context.peek(KEYBOARD_OFFSET + i)).collect();
-        let shift = keys.contains(&64) || self.context.capslock;
+        let shift = keys.contains(&64) || borrow.capslock;
         for i in keys {
             if context.keyp_with_hold_period(i, 60, 5) {
                 let c = match i {
@@ -151,67 +151,68 @@ impl WheelSystem {
 
 impl crate::cartridge::CartProgram for WheelSystem {
     fn update(&mut self, context: &mut crate::cartridge::CartContext) {
+        let mut self_context = self.context.borrow_mut();
         if let Some(program) = &self.program {
-            program.borrow_mut().update(context, &mut self.context);
-            if self.context.exit_flag {
+            program.borrow_mut().update(context, &mut self_context);
+            if self_context.exit_flag {
                 self.program = None;
-                self.context.exit_flag = false;
+                self_context.exit_flag = false;
             }
             return;
         }
         context.cls(0);
-        for i in self.context.top_line..self.context.lines.len() {
-            context.print_ch(&self.context.lines[i], 0, (i - self.context.top_line) as i32 * 9, 13, true, 1, false);
+        for i in self_context.top_line..self_context.lines.len() {
+            context.print_ch(&self_context.lines[i], 0, (i - self_context.top_line) as i32 * 9, 13, true, 1, false);
         }
-        let input_lines = SystemContext::split_line(&(">".to_string() + &self.context.input_buffer));
+        let input_lines = SystemContext::split_line(&(">".to_string() + &self_context.input_buffer));
         for i in 0..input_lines.len() {
-            context.print_ch(&input_lines[i], 0, (self.context.lines.len() - self.context.top_line) as i32 * 9 + i as i32 * 9, 13, true, 1, false);
+            context.print_ch(&input_lines[i], 0, (self_context.lines.len() - self_context.top_line) as i32 * 9 + i as i32 * 9, 13, true, 1, false);
         }
-        //context.print_ch(, 0, (self.context.lines.len() - self.context.top_line) as i32 * 9, 13, true, 1, false);
+        //context.print_ch(, 0, (self_context.lines.len() - self_context.top_line) as i32 * 9, 13, true, 1, false);
         if context.keyp(Some(62)) {
-            self.context.capslock = !self.context.capslock;
+            self_context.capslock = !self_context.capslock;
         }
-        if let Some(c) = self.get_char(context) {
-            self.context.scroll_to_bottom();
-            self.context.input_buffer.push(c);
+        if let Some(c) = self.get_char(context, &self_context) {
+            self_context.scroll_to_bottom();
+            self_context.input_buffer.push(c);
         }
         if context.keyp_with_hold_period(50, 60, 5) {
-            self.context.lines.extend(input_lines);
-            match self.context.input_buffer.as_str() {
+            self_context.lines.extend(input_lines);
+            match self_context.input_buffer.as_str() {
                 "" => {},
-                "clear" => self.context.lines.clear(),
-                "cls" => self.context.lines.clear(),
+                "clear" => self_context.lines.clear(),
+                "cls" => self_context.lines.clear(),
                 "run" => {
-                    self.context.program_timer = Date::now() as u64;
-                    self.demo.borrow_mut().init(context, &mut self.context);
+                    self_context.program_timer = Date::now() as u64;
+                    self.demo.borrow_mut().init(context, &mut self_context);
                     self.program = Some(self.demo.clone());
                 },
                 _ => {
-                    self.context.lines.push("未知命令".to_string());
+                    self_context.lines.push("未知命令".to_string());
                 },
             }
-            self.context.input_buffer.clear();
-            self.context.scroll_to_bottom();
+            self_context.input_buffer.clear();
+            self_context.scroll_to_bottom();
         }
         if context.keyp_with_hold_period(51, 60, 5) {
-            self.context.input_buffer.pop();
+            self_context.input_buffer.pop();
         }
         let (_, _, _, _, _, _, sy) = context.mouse();
         if sy > 0 {
-            self.context.scroll(1);
+            self_context.scroll(1);
         } else if sy < 0 {
-            self.context.scroll(-1);
+            self_context.scroll(-1);
         }
 
     }
     fn scanline(&mut self, context: &mut crate::cartridge::CartContext, line_i: usize) {
         if let Some(program) = &self.program {
-            program.borrow_mut().scanline(context, &mut self.context, line_i as i32);
+            program.borrow_mut().scanline(context, &mut self.context.borrow_mut(), line_i as i32);
         }
     }
     fn overlay(&mut self, context: &mut crate::cartridge::CartContext) {
         if let Some(program) = &self.program {
-            program.borrow_mut().overlay(context, &mut self.context);
+            program.borrow_mut().overlay(context, &mut self.context.borrow_mut());
         }
     }
 }
