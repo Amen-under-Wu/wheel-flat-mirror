@@ -3,6 +3,8 @@ pub mod pix_mask;
 use crate::cartridge::ram::{Vram, Ram};
 use crate::cartridge::pix_mask::PixMask;
 use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub struct CartContext {
     ram: Vec<Ram>,
@@ -757,7 +759,7 @@ pub trait CartProgram {
 }
 
 pub struct Cartridge {
-    context: CartContext,
+    context: Rc<RefCell<CartContext>>,
     program: Box<dyn CartProgram>,
 }
 
@@ -766,15 +768,16 @@ impl Cartridge {
     const BORDER_H: usize = 4;
     pub fn new(program: Box<dyn CartProgram>) -> Self {
         Self {
-            context: CartContext::new(),
+            context: Rc::new(RefCell::new(CartContext::new())),
             program
         }
     }
-    fn get_color(&self, color: u8) -> u32 {
-        let true_index = self.context.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize) as usize;
-        let r = self.context.peek(Vram::PALETTE_OFFSET + true_index * 3) as u32;
-        let g = self.context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 1) as u32;
-        let b = self.context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 2) as u32;
+    fn get_color(&self, color: u8, borrow: &CartContext) -> u32 {
+        let context = borrow;
+        let true_index = context.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize) as usize;
+        let r = context.peek(Vram::PALETTE_OFFSET + true_index * 3) as u32;
+        let g = context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 1) as u32;
+        let b = context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 2) as u32;
         (r << 16) | (g << 8) | b
     }
 }
@@ -803,23 +806,24 @@ fn draw_sub_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, data: [
 
 impl crate::WheelProgram for Cartridge {
     fn init(&mut self, _wheel: &mut dyn crate::WheelInterface) {
-        self.program.init(&mut self.context);
+        self.program.init(&mut self.context.borrow_mut());
     }
     fn update(&mut self, wheel: &mut dyn crate::WheelInterface) {
+        let mut context = self.context.borrow_mut();
         // get input
         let mut btns = wheel.get_buttons();
         let keys = wheel.get_keys();
 
         let mut gamepad_map = 0;
         for i in 0..8 {
-            if keys.contains(&self.context.peek(Ram::GAMEPAD_MAPPING_OFFSET + i)) {
+            if keys.contains(&context.peek(Ram::GAMEPAD_MAPPING_OFFSET + i)) {
                 gamepad_map |= 1 << i;
             }
         }
         btns[0] |= gamepad_map;
         for i in 0..4 {
-            self.context.poke(Ram::GAMEPADS_OFFSET + i, btns[i]);
-            self.context.poke(Ram::KEYBOARD_OFFSET + i, keys[i]);
+            context.poke(Ram::GAMEPADS_OFFSET + i, btns[i]);
+            context.poke(Ram::KEYBOARD_OFFSET + i, keys[i]);
         }
 
         // use direct input to update, instead of ram data
@@ -827,13 +831,13 @@ impl crate::WheelProgram for Cartridge {
         let btn_bin = u32::from_le_bytes(btns);
         for i in 0..32 {
             if (btn_bin & (1 << i)) == 0 {
-                self.context.btn_timer[i] = -1;
+                context.btn_timer[i] = -1;
             } else {
-                self.context.btn_timer[i] += 1;
+                context.btn_timer[i] += 1;
             }
         }
         let mut key_del_list = Vec::new();
-        for (key, time) in self.context.key_timer.iter_mut() {
+        for (key, time) in context.key_timer.iter_mut() {
             if keys.contains(key) {
                 *time += 1;
             } else {
@@ -841,11 +845,11 @@ impl crate::WheelProgram for Cartridge {
             }
         }
         for key in key_del_list {
-            self.context.key_timer.remove(&key);
+            context.key_timer.remove(&key);
         }
         for key in keys {
-            if !self.context.key_timer.contains_key(&key) {
-                self.context.key_timer.insert(key, 0);
+            if !context.key_timer.contains_key(&key) {
+                context.key_timer.insert(key, 0);
             }
         }
         let mouse = wheel.get_mouse();
@@ -865,38 +869,39 @@ impl crate::WheelProgram for Cartridge {
             mouse_x = -1;
             mouse_y = -1;
         }
-        self.context.poke(Ram::MOUSE_OFFSET, mouse_x as u8);
-        self.context.poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
+        context.poke(Ram::MOUSE_OFFSET, mouse_x as u8);
+        context.poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
         const SCROLL_FACTOR: i32 = 50;
         let mut mouse_lw: u16 = mouse.left as u16 | ((mouse.middle as u16) << 1) | ((mouse.right as u16) << 2);
         let scroll_x = mouse.scroll_x / SCROLL_FACTOR;
         let scroll_y = mouse.scroll_y / SCROLL_FACTOR;
         mouse_lw |= ((scroll_x & 0b111111) as u16) << 3;
         mouse_lw |= ((scroll_y & 0b111111) as u16) << 9;
-        self.context.poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
-        self.context.poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
+        context.poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
+        context.poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
 
         // draw screen
-        self.context.ram[self.context.active_bank].set_active_vbank(0);
-        self.program.update(&mut self.context);
+        let x = context.active_bank.clone();
+        context.ram[x].set_active_vbank(0);
+        self.program.update(&mut context);
         for i in 0..Self::BORDER_H {
-            self.program.scanline(&mut self.context, i);
-            let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
+            self.program.scanline(&mut context, i);
+            let color = self.get_color(context.peek(Vram::BORDER_COLOR_OFFSET), &context);
             for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
                 draw_fat_pixel(wheel, x, i as i32, color);
             }
         }
         for i in 0..Vram::SCREEN_HEIGHT {
-            self.program.scanline(&mut self.context, i + Self::BORDER_H);
-            let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
-            let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
-            let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
+            self.program.scanline(&mut context, i + Self::BORDER_H);
+            let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c, &context)).collect();
+            let x_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
+            let y_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
             let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
             for xx in 0..Vram::SCREEN_WIDTH {
-                let color = palette[self.context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
+                let color = palette[context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
                 let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                 draw_fat_pixel(wheel, x, y, color);
-                let subpix = self.context.get_subpix_map_mut().get(xx, i);
+                let subpix = context.get_subpix_map_mut().get(xx, i);
                 if let Some(arr) = subpix {
                     let mut colors = [0; 4];
                     for j in 0..4 {
@@ -905,7 +910,7 @@ impl crate::WheelProgram for Cartridge {
                     draw_sub_pixel(wheel, x, y, colors);
                 }
             }
-            let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
+            let color = self.get_color(context.peek(Vram::BORDER_COLOR_OFFSET), &context);
             for x in 0..Self::BORDER_W as i32 {
                 draw_fat_pixel(wheel, x, y, color);
                 let x = x + (Self::BORDER_W + Vram::SCREEN_WIDTH) as i32;
@@ -914,28 +919,29 @@ impl crate::WheelProgram for Cartridge {
         }
         for i in 0..Self::BORDER_H {
             let ii = i + Self::BORDER_H + Vram::SCREEN_HEIGHT;
-            self.program.scanline(&mut self.context, ii);
-            let color = self.get_color(self.context.peek(Vram::BORDER_COLOR_OFFSET));
+            self.program.scanline(&mut context, ii);
+            let color = self.get_color(context.peek(Vram::BORDER_COLOR_OFFSET), &context);
             for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
                 draw_fat_pixel(wheel, x, ii as i32, color);
             }
         }
 
-        self.context.ram[self.context.active_bank].set_active_vbank(1);
-        self.program.overlay(&mut self.context);
-        let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
-        let trans_color = self.context.peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
-        let x_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
-        let y_offset: i32 = (self.context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
+        let x = context.active_bank.clone();
+        context.ram[x].set_active_vbank(1);
+        self.program.overlay(&mut context);
+        let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c, &context)).collect();
+        let trans_color = context.peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
+        let x_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
+        let y_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
         for i in 0..Vram::SCREEN_HEIGHT{
             let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
             for xx in 0..Vram::SCREEN_WIDTH {
-                let color_id = self.context.peek4(i * Vram::SCREEN_WIDTH + xx);
+                let color_id = context.peek4(i * Vram::SCREEN_WIDTH + xx);
                 if color_id != trans_color {
                     let color = palette[color_id as usize];
                     let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                     draw_fat_pixel(wheel, x, y, color);
-                    let subpix = self.context.get_subpix_map_mut().get(xx, i);
+                    let subpix = context.get_subpix_map_mut().get(xx, i);
                     if let Some(arr) = subpix {
                         let mut colors = [0; 4];
                         for j in 0..4 {
