@@ -31,8 +31,8 @@ window.start_loop = start_loop;
 export function main() {
     document.querySelector("button").remove();
     //playSquareWave();
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const wheel = Wheel.new(audioContext);
+    //const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const wheel = Wheel.new();
     window.wheel_obj = wheel;
     start_loop(() => {window.wheel_obj.update();})
 }

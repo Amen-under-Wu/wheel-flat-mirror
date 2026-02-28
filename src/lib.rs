@@ -2,23 +2,23 @@ mod io_device;
 mod cartridge;
 mod data;
 mod system;
+mod web_bindings;
 
-use crate::io_device::{graphics_device, audio_device, input_device};
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
 struct WheelContext {
-    screen: Box<dyn graphics_device::Display>,
-    speaker: Box<dyn audio_device::PlayRegister>,
+    screen: Box<dyn io_device::Display>,
+    speaker: Box<dyn io_device::PlayRegister>,
     vbuffer: Vec<u8>,
-    abuffer: [audio_device::WheelSoundRegister; 4],
-    ibuffer: Box<dyn input_device::GetInput>,
+    abuffer: [io_device::WheelSoundRegister; 4],
+    ibuffer: Box<dyn io_device::GetInput>,
 }
 
 impl WheelContext {
-    fn new(audio_context: web_sys::AudioContext) -> Self {
+    fn new() -> Self {
         let window = web_sys::window().expect("no global window exists");
         let document = window.document().expect("no document on window");
         let canvas = document
@@ -28,21 +28,21 @@ impl WheelContext {
         canvas.set_width((240+16)*4);
         canvas.set_height((136+8)*4);
         let gl = canvas.get_context("webgl2").unwrap().unwrap().dyn_into::<GL>().unwrap();
-        let mut screen = graphics_device::Screen::new(gl);
+        let mut screen = web_bindings::Screen::new(gl);
         screen.adjust_size(canvas.width() as f32);
 
         let rect = canvas.get_bounding_client_rect();
 
-        let ibuffer = input_device::InputDevice::new_refcell();
-        input_device::InputDevice::link(&ibuffer, &canvas.dyn_into::<web_sys::EventTarget>().unwrap());
+        let ibuffer = web_bindings::InputDevice::new_refcell();
+        web_bindings::InputDevice::link(&ibuffer, &canvas.dyn_into::<web_sys::EventTarget>().unwrap());
         ibuffer.borrow_mut().set_rect(rect.x() as i32, rect.y() as i32, rect.width() as i32, rect.height() as i32,
-            graphics_device::Screen::WIDTH as i32, graphics_device::Screen::HEIGHT as i32);
+            web_bindings::Screen::WIDTH as i32, web_bindings::Screen::HEIGHT as i32);
 
         Self {
             screen: Box::new(screen),
-            speaker: Box::new(audio_device::Speaker::new(audio_context)),
-            vbuffer: vec![0; (graphics_device::Screen::WIDTH * graphics_device::Screen::HEIGHT * 3) as usize],
-            abuffer: [audio_device::WheelSoundRegister::new(); 4],
+            speaker: Box::new(web_bindings::DummySpeaker::new()),
+            vbuffer: vec![0; (web_bindings::Screen::WIDTH * web_bindings::Screen::HEIGHT * 3) as usize],
+            abuffer: [io_device::WheelSoundRegister::new(); 4],
             ibuffer: Box::new(ibuffer),
         }
     }
@@ -51,7 +51,7 @@ impl WheelContext {
         self.speaker.set_registers(&self.abuffer);
     }
     fn in_screen(x: i32, y: i32) -> bool {
-        x >= 0 && y >= 0 && (x as u32) < graphics_device::Screen::WIDTH && (y as u32) < graphics_device::Screen::HEIGHT
+        x >= 0 && y >= 0 && (x as u32) < web_bindings::Screen::WIDTH && (y as u32) < web_bindings::Screen::HEIGHT
     }
 }
 
@@ -61,20 +61,20 @@ pub trait WheelInterface {
     fn play(&mut self, channel: usize, waveform: [u8; 32], volumn: u8, freq: u16);
     fn get_buttons(&self) -> [u8; 4];
     fn get_keys(&self) -> [u8; 4];
-    fn get_mouse(&self) -> input_device::MouseData;
+    fn get_mouse(&self) -> io_device::MouseData;
 }
 
 impl WheelInterface for WheelContext {
     fn draw_pixel(&mut self, x: i32, y: i32, color: u32) {
         if Self::in_screen(x, y) {
-            let idx: usize = (y as u32 * graphics_device::Screen::WIDTH + x as u32) as usize * 3;
+            let idx: usize = (y as u32 * web_bindings::Screen::WIDTH + x as u32) as usize * 3;
             self.vbuffer[idx] = ((color >> 16) & 0xff) as u8;
             self.vbuffer[idx + 1] = ((color >> 8) & 0xff) as u8;
             self.vbuffer[idx + 2] = (color & 0xff) as u8;
         }
     }
     fn draw_pixel_unsafe(&mut self, x: i32, y: i32, color: u32) {
-        let idx: usize = (y as u32 * graphics_device::Screen::WIDTH + x as u32) as usize * 3;
+        let idx: usize = (y as u32 * web_bindings::Screen::WIDTH + x as u32) as usize * 3;
         self.vbuffer[idx] = ((color >> 16) & 0xff) as u8;
         self.vbuffer[idx + 1] = ((color >> 8) & 0xff) as u8;
         self.vbuffer[idx + 2] = (color & 0xff) as u8;
@@ -92,7 +92,7 @@ impl WheelInterface for WheelContext {
     fn get_keys(&self) -> [u8; 4] {
         self.ibuffer.get_input().key
     }
-    fn get_mouse(&self) -> input_device::MouseData {
+    fn get_mouse(&self) -> io_device::MouseData {
         self.ibuffer.get_input().mouse
     }
 }
@@ -203,8 +203,8 @@ struct Wheel {
 
 #[wasm_bindgen]
 impl Wheel {
-    pub fn new(audio_context: web_sys::AudioContext) -> Self {
-        let mut context = WheelContext::new(audio_context);
+    pub fn new() -> Self {
+        let mut context = WheelContext::new();
         let mut program = cartridge::Cartridge::new(Box::new(system::WheelSystem::new(Rc::new(RefCell::new(DemoProgram::new())))));
         program.init(&mut context);
         Self {
