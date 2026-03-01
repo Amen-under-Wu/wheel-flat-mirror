@@ -17,7 +17,7 @@ impl SystemContext {
     const MAX_LINES: usize = crate::cartridge::ram::Vram::SCREEN_HEIGHT / 9;
     pub fn new() -> Self {
         Self {
-            lines: vec!["拓竹杯参赛作品 wheel flat 轮扁".to_string(), "输入 run 进入演示".to_string()],
+            lines: vec!["拓竹杯参赛作品 wheel flat 轮扁".to_string(), "输入 run 进入演示,按esc回到终端".to_string()],
             input_buffer: String::new(),
             cursor_pos: 0,
             top_line: 0,

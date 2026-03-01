@@ -3,7 +3,7 @@ mod cartridge;
 mod data;
 mod system;
 mod web_bindings;
-//mod script;
+mod script;
 mod wrapper;
 
 
@@ -12,8 +12,8 @@ use wasm_bindgen::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-//use crate::script::js::JsScript;
-//use crate::script::WheelScript;
+use crate::script::js::JsScript;
+use crate::script::WheelScript;
 
 struct WheelContext {
     screen: Box<dyn io_device::Display>,
@@ -222,7 +222,10 @@ impl Wheel {
     pub fn new() -> Self {
         let context = WheelContext::new();
         let mut program = Box::new(wrapper::WheelWrapper::new());
-        program.programs.insert("demo".to_string(), Rc::new(RefCell::new(DemoProgram::new())));
+        program.programs.insert("demo_0".to_string(), Rc::new(RefCell::new(DemoProgram::new())));
+        let mut js_script = JsScript::new();
+        js_script.load("function update() {cls_1(4); if (keyp_1(66)) {trace('demo exit', 13); exit();}}").unwrap();
+        program.programs.insert("demo".to_string(), Rc::new(RefCell::new(js_script)));
         Self {
             context,
             program,
