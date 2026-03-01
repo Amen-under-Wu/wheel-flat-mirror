@@ -7,11 +7,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 pub struct CartContext {
-    ram: Vec<Ram>,
-    active_bank: usize,
+    pub ram: Vec<Ram>,
+    pub active_bank: usize,
     clip_rect: (i32, i32, i32, i32),
-    key_timer: HashMap<u8, u32>,
-    btn_timer: [i32; 32],
+    pub key_timer: HashMap<u8, u32>,
+    pub btn_timer: [i32; 32],
     ch_font: (Vec<u8>, Vec<u8>),
 }
 
@@ -28,7 +28,7 @@ impl CartContext {
         }
     }
 
-    fn get_subpix_map_mut(&mut self) -> &mut PixMask {
+    pub fn get_subpix_map_mut(&mut self) -> &mut PixMask {
         self.ram[self.active_bank].get_subpixels_mut()
     }
 
@@ -748,212 +748,6 @@ impl CartContext {
         let y = self.peek(Ram::MOUSE_OFFSET + 1) as u8;
         let res: u16 = self.peek(Ram::MOUSE_OFFSET + 2) as u16 | ((self.peek(Ram::MOUSE_OFFSET + 3) as u16) << 8);
         (x, y, (res & 1) != 0, (res & 2) != 0, (res & 4) != 0, ((res >> 1) as i8) >> 2, ((res >> 7) as i8) >> 2)
-    }
-}
-
-pub trait CartProgram {
-    fn init(&mut self, context: &mut CartContext) {}
-    fn update(&mut self, context: &mut CartContext) {}
-    fn scanline(&mut self, context: &mut CartContext, line_i: usize) {}
-    fn overlay(&mut self, context: &mut CartContext) {}
-}
-
-pub struct Cartridge {
-    context: Rc<RefCell<CartContext>>,
-    program: Box<dyn CartProgram>,
-}
-
-impl Cartridge {
-    const BORDER_W: usize = 8;
-    const BORDER_H: usize = 4;
-    pub fn new(program: Box<dyn CartProgram>) -> Self {
-        Self {
-            context: Rc::new(RefCell::new(CartContext::new())),
-            program
-        }
-    }
-    fn get_color(&self, color: u8, borrow: &CartContext) -> u32 {
-        let context = borrow;
-        let true_index = context.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize) as usize;
-        let r = context.peek(Vram::PALETTE_OFFSET + true_index * 3) as u32;
-        let g = context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 1) as u32;
-        let b = context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 2) as u32;
-        (r << 16) | (g << 8) | b
-    }
-}
-
-fn draw_fat_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, color: u32) {
-    wheel.draw_pixel(x * 2, y * 2, color);
-    wheel.draw_pixel(x * 2 + 1, y * 2, color);
-    wheel.draw_pixel(x * 2, y * 2 + 1, color);
-    wheel.draw_pixel(x * 2 + 1, y * 2 + 1, color);
-}
-
-fn draw_sub_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, data: [u32; 4]) {
-    if data[0] <= 0xFFFFFF {
-        wheel.draw_pixel(x * 2, y * 2, data[0]);
-    }
-    if data[1] <= 0xFFFFFF {
-        wheel.draw_pixel(x * 2 + 1, y * 2, data[1]);
-    }
-    if data[2] <= 0xFFFFFF {
-        wheel.draw_pixel(x * 2, y * 2 + 1, data[2]);
-    }
-    if data[3] <= 0xFFFFFF {
-        wheel.draw_pixel(x * 2 + 1, y * 2 + 1, data[3]);
-    }
-}
-
-impl crate::WheelProgram for Cartridge {
-    fn init(&mut self, _wheel: &mut dyn crate::WheelInterface) {
-        self.program.init(&mut self.context.borrow_mut());
-    }
-    fn update(&mut self, wheel: &mut dyn crate::WheelInterface) {
-        let mut context = self.context.borrow_mut();
-        // get input
-        let mut btns = wheel.get_buttons();
-        let keys = wheel.get_keys();
-
-        let mut gamepad_map = 0;
-        for i in 0..8 {
-            if keys.contains(&context.peek(Ram::GAMEPAD_MAPPING_OFFSET + i)) {
-                gamepad_map |= 1 << i;
-            }
-        }
-        btns[0] |= gamepad_map;
-        for i in 0..4 {
-            context.poke(Ram::GAMEPADS_OFFSET + i, btns[i]);
-            context.poke(Ram::KEYBOARD_OFFSET + i, keys[i]);
-        }
-
-        // use direct input to update, instead of ram data
-        // correctness to be confirmed
-        let btn_bin = u32::from_le_bytes(btns);
-        for i in 0..32 {
-            if (btn_bin & (1 << i)) == 0 {
-                context.btn_timer[i] = -1;
-            } else {
-                context.btn_timer[i] += 1;
-            }
-        }
-        let mut key_del_list = Vec::new();
-        for (key, time) in context.key_timer.iter_mut() {
-            if keys.contains(key) {
-                *time += 1;
-            } else {
-                key_del_list.push(*key);
-            }
-        }
-        for key in key_del_list {
-            context.key_timer.remove(&key);
-        }
-        for key in keys {
-            if !context.key_timer.contains_key(&key) {
-                context.key_timer.insert(key, 0);
-            }
-        }
-        let mouse = wheel.get_mouse();
-        let mut mouse_x = 
-            if mouse.x > (Self::BORDER_W * 2) as i32 && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32 {
-                mouse.x / 2 - Self::BORDER_W as i32
-            } else {
-                -1
-            };
-        let mut mouse_y = 
-            if mouse.y > (Self::BORDER_H * 2) as i32 && mouse.y <= 2 * (Vram::SCREEN_HEIGHT + 2 * Self::BORDER_H) as i32 {
-                mouse.y / 2 - Self::BORDER_H as i32
-            } else {
-                -1
-            };
-        if mouse_x == -1 || mouse_y == -1 {
-            mouse_x = -1;
-            mouse_y = -1;
-        }
-        context.poke(Ram::MOUSE_OFFSET, mouse_x as u8);
-        context.poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
-        const SCROLL_FACTOR: i32 = 50;
-        let mut mouse_lw: u16 = mouse.left as u16 | ((mouse.middle as u16) << 1) | ((mouse.right as u16) << 2);
-        let scroll_x = mouse.scroll_x / SCROLL_FACTOR;
-        let scroll_y = mouse.scroll_y / SCROLL_FACTOR;
-        mouse_lw |= ((scroll_x & 0b111111) as u16) << 3;
-        mouse_lw |= ((scroll_y & 0b111111) as u16) << 9;
-        context.poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
-        context.poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
-
-        // draw screen
-        let x = context.active_bank.clone();
-        context.ram[x].set_active_vbank(0);
-        self.program.update(&mut context);
-        for i in 0..Self::BORDER_H {
-            self.program.scanline(&mut context, i);
-            let color = self.get_color(context.peek(Vram::BORDER_COLOR_OFFSET), &context);
-            for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
-                draw_fat_pixel(wheel, x, i as i32, color);
-            }
-        }
-        for i in 0..Vram::SCREEN_HEIGHT {
-            self.program.scanline(&mut context, i + Self::BORDER_H);
-            let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c, &context)).collect();
-            let x_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
-            let y_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
-            let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
-            for xx in 0..Vram::SCREEN_WIDTH {
-                let color = palette[context.peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
-                let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
-                draw_fat_pixel(wheel, x, y, color);
-                let subpix = context.get_subpix_map_mut().get(xx, i);
-                if let Some(arr) = subpix {
-                    let mut colors = [0; 4];
-                    for j in 0..4 {
-                        colors[j] = if arr[j] < 16 { palette[arr[j] as usize] } else { 0xFFFFFFFF };
-                    }
-                    draw_sub_pixel(wheel, x, y, colors);
-                }
-            }
-            let color = self.get_color(context.peek(Vram::BORDER_COLOR_OFFSET), &context);
-            for x in 0..Self::BORDER_W as i32 {
-                draw_fat_pixel(wheel, x, y, color);
-                let x = x + (Self::BORDER_W + Vram::SCREEN_WIDTH) as i32;
-                draw_fat_pixel(wheel, x, y, color);
-            }
-        }
-        for i in 0..Self::BORDER_H {
-            let ii = i + Self::BORDER_H + Vram::SCREEN_HEIGHT;
-            self.program.scanline(&mut context, ii);
-            let color = self.get_color(context.peek(Vram::BORDER_COLOR_OFFSET), &context);
-            for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
-                draw_fat_pixel(wheel, x, ii as i32, color);
-            }
-        }
-
-        let x = context.active_bank.clone();
-        context.ram[x].set_active_vbank(1);
-        self.program.overlay(&mut context);
-        let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c, &context)).collect();
-        let trans_color = context.peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
-        let x_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
-        let y_offset: i32 = (context.peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
-        for i in 0..Vram::SCREEN_HEIGHT{
-            let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
-            for xx in 0..Vram::SCREEN_WIDTH {
-                let color_id = context.peek4(i * Vram::SCREEN_WIDTH + xx);
-                if color_id != trans_color {
-                    let color = palette[color_id as usize];
-                    let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
-                    draw_fat_pixel(wheel, x, y, color);
-                    let subpix = context.get_subpix_map_mut().get(xx, i);
-                    if let Some(arr) = subpix {
-                        let mut colors = [0; 4];
-                        for j in 0..4 {
-                            colors[j] = if arr[j] < 16 { palette[arr[j] as usize] } else { 0xFFFFFFFF };
-                        }
-                        draw_sub_pixel(wheel, x, y, colors);
-                    }
-                }
-            }
-        }
-
-        // todo: play sound
     }
 }
 

@@ -3,11 +3,17 @@ mod cartridge;
 mod data;
 mod system;
 mod web_bindings;
+//mod script;
+mod wrapper;
+
 
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
+
+//use crate::script::js::JsScript;
+//use crate::script::WheelScript;
 
 struct WheelContext {
     screen: Box<dyn io_device::Display>,
@@ -105,19 +111,28 @@ pub trait WheelProgram {
 use std::collections::HashMap;
 
 struct DemoProgram {
+    cart: Option<Rc<RefCell<cartridge::CartContext>>>,
+    sys: Option<Rc<RefCell<system::SystemContext>>>,
     i32_data: HashMap<String, i32>,
 }
 
 impl DemoProgram {
     fn new() -> Self {
         Self {
+            cart: None,
+            sys: None,
             i32_data: HashMap::new(),
         }
     }
 }
 
-impl system::SystemProgram for DemoProgram {
-    fn init(&mut self, context: &mut cartridge::CartContext, sys_context: &mut system::SystemContext) {
+impl wrapper::InternalProgram for DemoProgram {
+    fn init(&mut self, cart: Rc<RefCell<cartridge::CartContext>>, system: Rc<RefCell<system::SystemContext>>) {
+        cart.borrow_mut().poke(0x4000, 0x22);
+        cart.borrow_mut().poke(0x8000, 1);
+        system.borrow_mut().trace("运行demo", 13);
+        self.cart = Some(cart);
+        self.sys = Some(system);
         self.i32_data.insert("t".to_string(), 0);
         self.i32_data.insert("x".to_string(), 0);
         self.i32_data.insert("y".to_string(), 0);
@@ -125,11 +140,12 @@ impl system::SystemProgram for DemoProgram {
         self.i32_data.insert("sy".to_string(), 24);
         self.i32_data.insert("shape".to_string(), 0);
         self.i32_data.insert("color".to_string(), 1);
-        context.poke(0x4000, 0x22);
-        context.poke(0x8000, 1);
-        sys_context.trace("运行demo", 13);
     }
-    fn update(&mut self, context: &mut cartridge::CartContext, sys_context: &mut system::SystemContext) {
+    fn update(&mut self) {
+        let binding = self.cart.clone().unwrap();
+        let mut context = binding.borrow_mut();
+        let binding = self.sys.clone().unwrap();
+        let mut sys_context = binding.borrow_mut();
         context.cls(13);
         context.map(1, 1, 10, 10, 0, 0, 255, 1);
         context.print_ch("你好wheel flat轮扁!", 84, 84, 0, false, 1, false);
@@ -186,7 +202,8 @@ impl system::SystemProgram for DemoProgram {
         }
 
         if context.keyp(Some(66)) {
-            sys_context.trace(&format!("运行时间：{} ms", sys_context.time()), 13);
+            let t = sys_context.time();
+            sys_context.trace(&format!("运行时间：{} ms", t), 13);
             sys_context.exit();
         }
 
@@ -194,19 +211,18 @@ impl system::SystemProgram for DemoProgram {
     }
 }
 
-
 #[wasm_bindgen]
 struct Wheel {
     context: WheelContext,
-    program: cartridge::Cartridge,
+    program: Box<dyn WheelProgram>,
 }
 
 #[wasm_bindgen]
 impl Wheel {
     pub fn new() -> Self {
-        let mut context = WheelContext::new();
-        let mut program = cartridge::Cartridge::new(Box::new(system::WheelSystem::new(Rc::new(RefCell::new(DemoProgram::new())))));
-        program.init(&mut context);
+        let context = WheelContext::new();
+        let mut program = Box::new(wrapper::WheelWrapper::new());
+        program.programs.insert("demo".to_string(), Rc::new(RefCell::new(DemoProgram::new())));
         Self {
             context,
             program,

@@ -1,15 +1,16 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use js_sys::Date;
+use crate::cartridge::CartContext;
 
 pub struct SystemContext {
-    lines: Vec<String>,
-    input_buffer: String,
-    cursor_pos: usize,
-    top_line: usize,
-    program_timer: u64,
-    exit_flag: bool,
-    capslock: bool,
+    pub lines: Vec<String>,
+    pub input_buffer: String,
+    pub cursor_pos: usize,
+    pub top_line: usize,
+    pub program_timer: u64,
+    pub exit_flag: bool,
+    pub capslock: bool,
 }
 
 impl SystemContext {
@@ -29,7 +30,7 @@ impl SystemContext {
         self.exit_flag = true;
     }
 
-    fn split_line(line: &str) -> Vec<String> {
+    pub fn split_line(line: &str) -> Vec<String> {
         let mut result = Vec::new();
         let mut current_line = String::new();
         let mut w = 0;
@@ -47,7 +48,7 @@ impl SystemContext {
         }
         result
     }
-    fn line_count(line: &str) -> usize { // used for input only
+    pub fn line_count(line: &str) -> usize { // used for input only
         let mut count = 0;
         let mut w = 6; // start with 6 to account for the ">" prompt
         for c in line.chars() {
@@ -75,7 +76,7 @@ impl SystemContext {
         (Date::now() / 1000.0) as u64
     }
 
-    fn scroll(&mut self, lines: i32) {
+    pub fn scroll(&mut self, lines: i32) {
         let max_top = if self.lines.len() + Self::line_count(&self.input_buffer) > Self::MAX_LINES { self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES } else { 0 };
         if lines > 0 {
             self.top_line = (self.top_line + lines as usize).min(max_top);
@@ -83,136 +84,8 @@ impl SystemContext {
             self.top_line = self.top_line.saturating_sub((-lines) as usize);
         }
     }
-    fn scroll_to_bottom(&mut self) {
+    pub fn scroll_to_bottom(&mut self) {
         let max_top = if self.lines.len() + Self::line_count(&self.input_buffer)> Self::MAX_LINES { self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES } else { 0 };
         self.top_line = max_top;
-    }
-
-}
-
-pub trait SystemProgram {
-    fn init(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext) {}
-    fn update(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext) {}
-    fn scanline(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext, i: i32) {}
-    fn overlay(&mut self, context: &mut crate::cartridge::CartContext, sys_context: &mut SystemContext) {}
-}
-
-pub struct WheelSystem {
-    context: Rc<RefCell<SystemContext>>,
-    demo: Rc<RefCell<dyn SystemProgram>>,
-    program: Option<Rc<RefCell<dyn SystemProgram>>>,
-}
-
-impl WheelSystem {
-    pub fn new(demo: Rc<RefCell<dyn SystemProgram>>) -> Self {
-        Self {
-            context: Rc::new(RefCell::new(SystemContext::new())),
-            demo,
-            program: None,
-        }
-    }
-    fn get_char(&self, context: &crate::cartridge::CartContext, borrow: &SystemContext) -> Option<char> {
-        const KEYBOARD_OFFSET: usize = crate::cartridge::ram::Ram::KEYBOARD_OFFSET;
-        const NUM_SHIFTS: [char; 10] = [')', '!', '@', '#', '$', '%', '^', '&', '*', '('];
-        let keys: Vec<u8> = (0..4).map(|i| context.peek(KEYBOARD_OFFSET + i)).collect();
-        let shift = keys.contains(&64) || borrow.capslock;
-        for i in keys {
-            if context.keyp_with_hold_period(i, 60, 5) {
-                let c = match i {
-                    1..=26 => (i - 1 + if shift { b'A' } else { b'a' }) as char,
-                    27..=36 => if shift { NUM_SHIFTS[(i - 27) as usize] } else { (i - 27 + b'0') as char },
-                    37 => if shift { '_' } else { '-' },
-                    38 => if shift { '+' } else { '=' },
-                    39 => if shift { '{' } else { '[' },
-                    40 => if shift { '}' } else { ']' },
-                    41 => if shift { '|' } else { '\\' },
-                    42 => if shift { ':' } else { ';' },
-                    43 => if shift { '"' } else { '\'' },
-                    44 => if shift { '~' } else { '`' },
-                    45 => if shift { '<' } else { ',' },
-                    46 => if shift { '>' } else { '.' },
-                    47 => if shift { '?' } else { '/' },
-                    48 => ' ',
-                    49 => '\t',
-                    79..=88 => (i - 79 + b'0') as char,
-                    89 => '+',
-                    90 => '-',
-                    91 => '*',
-                    92 => '/',
-                    94 => '.',
-                    _ => continue,
-                };
-                return Some(c);
-            }
-        }
-        None
-    }
-}
-
-impl crate::cartridge::CartProgram for WheelSystem {
-    fn update(&mut self, context: &mut crate::cartridge::CartContext) {
-        let mut self_context = self.context.borrow_mut();
-        if let Some(program) = &self.program {
-            program.borrow_mut().update(context, &mut self_context);
-            if self_context.exit_flag {
-                self.program = None;
-                self_context.exit_flag = false;
-            }
-            return;
-        }
-        context.cls(0);
-        for i in self_context.top_line..self_context.lines.len() {
-            context.print_ch(&self_context.lines[i], 0, (i - self_context.top_line) as i32 * 9, 13, true, 1, false);
-        }
-        let input_lines = SystemContext::split_line(&(">".to_string() + &self_context.input_buffer));
-        for i in 0..input_lines.len() {
-            context.print_ch(&input_lines[i], 0, (self_context.lines.len() - self_context.top_line) as i32 * 9 + i as i32 * 9, 13, true, 1, false);
-        }
-        //context.print_ch(, 0, (self_context.lines.len() - self_context.top_line) as i32 * 9, 13, true, 1, false);
-        if context.keyp(Some(62)) {
-            self_context.capslock = !self_context.capslock;
-        }
-        if let Some(c) = self.get_char(context, &self_context) {
-            self_context.scroll_to_bottom();
-            self_context.input_buffer.push(c);
-        }
-        if context.keyp_with_hold_period(50, 60, 5) {
-            self_context.lines.extend(input_lines);
-            match self_context.input_buffer.as_str() {
-                "" => {},
-                "clear" => self_context.lines.clear(),
-                "cls" => self_context.lines.clear(),
-                "run" => {
-                    self_context.program_timer = Date::now() as u64;
-                    self.demo.borrow_mut().init(context, &mut self_context);
-                    self.program = Some(self.demo.clone());
-                },
-                _ => {
-                    self_context.lines.push("未知命令".to_string());
-                },
-            }
-            self_context.input_buffer.clear();
-            self_context.scroll_to_bottom();
-        }
-        if context.keyp_with_hold_period(51, 60, 5) {
-            self_context.input_buffer.pop();
-        }
-        let (_, _, _, _, _, _, sy) = context.mouse();
-        if sy > 0 {
-            self_context.scroll(1);
-        } else if sy < 0 {
-            self_context.scroll(-1);
-        }
-
-    }
-    fn scanline(&mut self, context: &mut crate::cartridge::CartContext, line_i: usize) {
-        if let Some(program) = &self.program {
-            program.borrow_mut().scanline(context, &mut self.context.borrow_mut(), line_i as i32);
-        }
-    }
-    fn overlay(&mut self, context: &mut crate::cartridge::CartContext) {
-        if let Some(program) = &self.program {
-            program.borrow_mut().overlay(context, &mut self.context.borrow_mut());
-        }
     }
 }
