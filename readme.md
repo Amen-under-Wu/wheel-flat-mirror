@@ -47,48 +47,26 @@ http-server
   - [ ] 音频api
   - [x] 键盘api
   - [x] 鼠标api
-- [ ] 封装底层接口，实现系统内核
+- [x] 封装底层接口，实现系统内核
 - [ ] 提供[“系统”api](https://github.com/nesbox/TIC-80/wiki/API)
   - [x] 回调函数
   - [ ] 绘图函数
-    - [x] circ
-    - [x] circb
-    - [x] elli
-    - [x] ellib
-    - [x] clip
-    - [x] cls
+    - [x] ...
     - [ ] font
-    - [x] line
-    - [x] map
-    - [x] pix
-    - [x] print
-    - [x] rect
-    - [x] rectb
-    - [x] spr
-    - [x] tri
-    - [x] trib
-    - [x] textri
   - [x] 输入函数
   - [ ] 音频函数
     - [ ] sfx
     - [ ] music
   - [ ] 内存操作函数
-    - [x] memcpy
-    - [x] memset
-    - [x] pmem
-    - [x] peek (1, 2, 4, 8)
-    - [x] poke (1, 2, 4, 8)
+    - [x] ...
     - [ ] sync
-    - [x] vbank
   - [x] 实用函数
   - [ ] 系统函数
-    - [x] exit
+    - [x] ...
     - [ ] reset
-    - [x] time
-    - [x] tstamp
-    - [x] trace
+    - [ ] trace (with color)
 - [ ] 实现系统console
-  - [ ] 滚动功能
+  - [x] 滚动功能
   - [ ] 选中功能
   - [ ] 复制粘贴功能
 - [ ] 实现中文输入法
