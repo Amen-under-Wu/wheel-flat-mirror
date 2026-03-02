@@ -12,6 +12,7 @@ use std::{
 pub trait WheelScript {
     fn bind(&mut self, cart: Rc<RefCell<CartContext>>, system: Rc<RefCell<SystemContext>>);
     fn load(&mut self, script: &str) -> Result<(), String>;
+    fn init(&mut self) -> Result<(), String>;
     fn update(&mut self) -> Result<(), String>;
     fn scanline(&mut self, line: i32) -> Result<(), String>;
     fn overlay(&mut self) -> Result<(), String>;
@@ -24,6 +25,9 @@ where
 {
     fn init(&mut self, cart: Rc<RefCell<CartContext>>, system: Rc<RefCell<SystemContext>>) {
         self.bind(cart, system);
+        if let Err(e) = self.init() {
+            self.log_error(&e);
+        }
     }
     fn update(&mut self) {
         if let Err(e) = self.update() {

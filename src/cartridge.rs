@@ -143,7 +143,7 @@ impl CartContext {
             self.get_subpix_map_mut().del(x as usize, y as usize);
         }
     }
-    pub fn get_pix(&mut self, x: i32, y: i32) -> u8 {
+    pub fn get_pix(&self, x: i32, y: i32) -> u8 {
         if self.in_clip(x, y) {
             self.peek4(y as usize * Vram::SCREEN_WIDTH + x as usize)
         } else {

@@ -224,7 +224,8 @@ impl Wheel {
         let mut program = Box::new(wrapper::WheelWrapper::new());
         program.programs.insert("demo_0".to_string(), Rc::new(RefCell::new(DemoProgram::new())));
         let mut js_script = JsScript::new();
-        js_script.load("function update() {cls_1(4); if (keyp_1(66)) {trace('demo exit', 13); exit();}}").unwrap();
+        let script_str = include_str!("demo.js");
+        js_script.load(script_str).unwrap();
         program.programs.insert("demo".to_string(), Rc::new(RefCell::new(js_script)));
         Self {
             context,
