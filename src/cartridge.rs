@@ -513,6 +513,7 @@ impl CartContext {
     }
     pub fn map(&mut self, x: i32, y: i32, w: i32, h: i32, sx: i32, sy: i32, trans_color: u8, scale: i32) {
         // remap param to be added when wrapping to lua, not here
+        // upd: adding remap requires rewriting the whole function in script lang. keep it in mind.
         for i in 0..h {
             for j in 0..w {
                 self.spr(self.mget(sx + j, sy + i), x + j * Ram::TILE_W as i32 * scale, y + i * Ram::TILE_H as i32 * scale, trans_color, scale, 0, 0, 1, 1);

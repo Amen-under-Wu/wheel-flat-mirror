@@ -38,12 +38,30 @@ function keyp(code, hold, period = 1) {
 }
 
 function map(x = 0, y = 0, w = 30, h = 17, sx = 0, sy = 0, trans_color = -1, scale = 1, remap) {
-    if (typeof remap === 'undefined') {
+    if (remap === undefined) {
         map_8(x, y, w, h, sx, sy, trans_color, scale);
     }
     else {
-        // rewrite map in js
+        for (let i = 0; i < h; ++i) {
+            for (let j = 0; j < w; ++j) {
+                const cell = mget(sx + j, sy + i);
+                const res = remap(cell, j, i);
+                let tile = cell, flip = 0, rotate = 0;
+                if (res !== undefined) {
+                    if (res[Symbol.iterator]) {
+                        tile = res[0] || cell;
+                        flip = res[1] || 0;
+                        rotate = res[2] || 0;
+                    }
+                    else {
+                        tile = res;
+                    }
+                }
+                spr_vec_9([tile, x + j * 8 * scale, y + i * 8 * scale, trans_color, scale, flip, rotate, 1, 1]);
+            }
+        }
     }
+
 }
 
 function peek(addr, bits = 8) {
