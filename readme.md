@@ -33,14 +33,15 @@ http-server
 
 终审时应至少完成至第三层。
 
-## 临时信息共享
-注意TIC-80窗口本身显示的范围大于240x136，其横向两侧各有8px边框，纵向两侧各有4px边框。边框中像素不能被lua脚本直接访问，但可以通过调整“边框颜色”的内存映射位进行有限的间接访问。还应注意TIC-80系统内置的鼠标可以在此区域显示，因此系统层的基础组件与TIC-80所给内存布局并不匹配，系统层之下不可做TIC-80内存布局的抽象模型。
+当前的程序架构大致为如下：
+
+- **底层**：`WheelContext`提供绘图、播放声音（待实现）、捕获输入、读写文件等接口，供`dyn WheelProgram`调用。
+- **中层**：`CartContext`提供内存布局及相关的各种功能接口，`SystemContext`提供终端输出、获取时间、退出程序等接口；`WheelWrapper`持有二者的共享所有权，将其接口暴露给`dyn InternalProgram`使用，并实现`trait WheelProgram`。
+- **上层**：JsScript实现`trait InternalProgram`，整合Wrapper中的接口到js环境，供内部存储的js脚本调用。
 
 ## TODO
 
 - [ ] 写文档😫
-
-- [ ] 帧数又撑不住了，谁救一下 (´;ω;`)
 
 - [ ] 用Rust调用web api
   - [x] 图像api
