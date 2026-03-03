@@ -17,6 +17,9 @@ pub trait WheelScript {
     fn scanline(&mut self, line: i32) -> Result<(), String>;
     fn overlay(&mut self) -> Result<(), String>;
     fn log_error(&mut self, message: &str);
+    fn save(&self) -> Option<Vec<u8>> {
+        None
+    }
 }
 
 impl<T> crate::wrapper::InternalProgram for T
@@ -43,5 +46,8 @@ where
         if let Err(e) = self.overlay() {
             self.log_error(&e);
         }
+    }
+    fn to_file(&self) -> Option<Vec<u8>> {
+        self.save()
     }
 }

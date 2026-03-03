@@ -17,6 +17,7 @@ pub struct WheelWrapper {
     system: Rc<RefCell<SystemContext>>,
     pub programs: HashMap<String, Rc<RefCell<dyn InternalProgram>>>,
     program: Option<Rc<RefCell<dyn InternalProgram>>>,
+    file_buffer: Vec<u8>,
 }
 
 impl WheelWrapper {
@@ -28,6 +29,7 @@ impl WheelWrapper {
             system: Rc::new(RefCell::new(SystemContext::new())),
             programs: HashMap::new(),
             program: None,
+            file_buffer: Vec::new(),
         }
     }
     fn self_update(&mut self) {
@@ -69,6 +71,7 @@ impl WheelWrapper {
                     self.programs["demo"].borrow_mut().init(self.cart.clone(), self.system.clone());
                     self.program = Some(self.programs["demo"].clone());
                 },
+                "save" => self.file_buffer = self.programs["demo"].borrow().to_file().unwrap_or_default(),
                 _ => {
                     self.system.borrow_mut().lines.push("未知命令".to_string());
                 },
@@ -137,6 +140,9 @@ pub trait InternalProgram {
     fn update(&mut self);
     fn scanline(&mut self, _i: usize) {}
     fn overlay(&mut self) {}
+    fn to_file(&self) -> Option<Vec<u8>> {
+        None
+    }
 }
 
 fn draw_fat_pixel(wheel: &mut dyn crate::WheelInterface, x: i32, y: i32, color: u32) {
@@ -315,5 +321,10 @@ impl crate::WheelProgram for WheelWrapper {
         }
 
         // todo: play sound
+
+        if !self.file_buffer.is_empty() {
+            wheel.save_file("demo.wheel", self.file_buffer.clone());
+            self.file_buffer.clear();
+        }
     }
 }

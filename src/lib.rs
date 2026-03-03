@@ -134,6 +134,7 @@ pub trait WheelProgram {
     fn update(&mut self, wheel: &mut dyn WheelInterface) {}
 }
 
+/*
 use std::collections::HashMap;
 
 struct DemoProgram {
@@ -236,7 +237,7 @@ impl wrapper::InternalProgram for DemoProgram {
         self.i32_data.entry("t".to_string()).and_modify(|x| *x += 1).or_insert(0);
     }
 }
-
+*/
 #[wasm_bindgen]
 struct Wheel {
     context: WheelContext,
@@ -248,7 +249,7 @@ impl Wheel {
     pub fn new() -> Self {
         let context = WheelContext::new();
         let mut program = Box::new(wrapper::WheelWrapper::new());
-        program.programs.insert("demo_0".to_string(), Rc::new(RefCell::new(DemoProgram::new())));
+        //program.programs.insert("demo_0".to_string(), Rc::new(RefCell::new(DemoProgram::new())));
         let mut js_script = JsScript::new();
         let script_str = include_str!("demo.js");
         js_script.load(script_str).unwrap();
@@ -265,8 +266,5 @@ impl Wheel {
     pub fn file_test(&mut self) {
         let data = self.context.read_file();
         web_sys::console::log_1(&format!("读取到文件，大小：{} bytes", data.len()).into());
-    }
-    pub fn upload_file(&mut self) {
-        self.context.upload_file();
     }
 }

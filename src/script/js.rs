@@ -390,11 +390,11 @@ impl WheelScript for JsScript {
         Reflect::set(&global, &"vbank".into(), &func).unwrap();
     }
     fn load(&mut self, script: &str) -> Result<(), String> {
+        self.script = script.to_string();
+
         let global = js_sys::global();
-    
         let eval = Reflect::get(&global, &JsValue::from_str("eval")).map_err(|e| format!("Error accessing eval: {:?}", e))?
             .dyn_into::<Function>().map_err(|e| format!("Error converting eval to Function: {:?}", e))?;
-        
         eval.call1(&JsValue::NULL, &JsValue::from_str(script)).map_err(|e| format!("Error executing script: {:?}", e))?;
         
         Ok(())
@@ -419,5 +419,8 @@ impl WheelScript for JsScript {
         web_sys::console::error_1(&message.into());
         self.system.as_ref().unwrap().borrow_mut().trace(message, 2);
         self.system.as_ref().unwrap().borrow_mut().exit();
+    }
+    fn save(&self) -> Option<Vec<u8>> {
+        Some(<JsScript as Savable>::save(self).to_bytes())
     }
 }
