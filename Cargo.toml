@@ -49,6 +49,7 @@ features = [
     "Blob",
     "HtmlAnchorElement",
     "HtmlInputElement",
+    "FileReader",
     "FileReaderSync",
     "FileList",
     "File",

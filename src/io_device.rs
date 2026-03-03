@@ -64,6 +64,7 @@ pub trait GetInput {
 }
 
 pub trait FileIO {
+    fn upload_file(&self);
     fn read_file(&self) -> Option<Vec<u8>>;
     fn write_file(&self, path: &str, data: &[u8]) -> bool;
 }

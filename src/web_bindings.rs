@@ -1,5 +1,5 @@
 use web_sys::WebGl2RenderingContext as GL;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 use crate::io_device::{self, *};
 
 pub struct Screen {
@@ -355,26 +355,56 @@ impl GetInput for Rc<RefCell<InputDevice>> {
     }
 }
 
-pub struct FileDevice {}
+pub struct FileDevice {
+}
 
 impl FileDevice {
     pub fn new() -> Self {
-        Self {}
+        Self {
+        }
     }
 }
 
 impl io_device::FileIO for FileDevice {
-    fn read_file(&self) -> Option<Vec<u8>> {
+    fn upload_file(&self) {
         let window = web_sys::window().unwrap();
         let document = window.document().unwrap();
-        let input = document.create_element("input").unwrap().dyn_into::<web_sys::HtmlInputElement>().unwrap();
+        let input = document.query_selector("input").unwrap()
+            .unwrap_or(document.create_element("input").unwrap())
+            .dyn_into::<web_sys::HtmlInputElement>().unwrap();
         input.set_type("file");
         input.click();
-        let file_list = input.files()?;
-        let file = file_list.get(0)?;
-        let reader = web_sys::FileReaderSync::new().ok()?;
-        let result = reader.read_as_array_buffer(&file).ok()?;
-        Some(result.dyn_into::<js_sys::Uint8Array>().ok()?.to_vec())
+    }
+    fn read_file(&self) -> Option<Vec<u8>> {
+        let window = web_sys::window()?;
+        
+        // 获取window.getFileData函数
+        let get_file_data = js_sys::Reflect::get(&window, &JsValue::from_str("getFileData")).ok()?;
+        
+        // 检查是否是函数
+        if !get_file_data.is_function() {
+            return None;
+        }
+        
+        // 调用函数获取Uint8Array
+        let file_data_js = js_sys::Function::from(get_file_data)
+            .call0(&window)
+            .ok()?;
+        
+        // 检查是否为空
+        if file_data_js.is_null() || file_data_js.is_undefined() {
+            return None;
+        }
+        let uint8array = file_data_js.dyn_into::<js_sys::Uint8Array>().ok()?;
+        
+        // 转换为Uint8Array
+        let uint8array = js_sys::Uint8Array::from(uint8array);
+        
+        // 创建Vec<u8>并复制数据
+        let mut vec = vec![0; uint8array.length() as usize];
+        uint8array.copy_to(&mut vec);
+        
+        Some(vec)
     }
     fn write_file(&self, path: &str, data: &[u8]) -> bool {
         let blob = web_sys::Blob::new_with_u8_array_sequence(&js_sys::Array::of1(&js_sys::Uint8Array::from(data))).unwrap();

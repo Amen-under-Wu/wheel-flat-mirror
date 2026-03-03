@@ -23,6 +23,8 @@ struct WheelContext {
     vbuffer: Vec<u8>,
     abuffer: [io_device::WheelSoundRegister; 4],
     ibuffer: Box<dyn io_device::GetInput>,
+    fbuffer: Vec<u8>,
+    file_flag: bool,
 }
 
 impl WheelContext {
@@ -53,11 +55,19 @@ impl WheelContext {
             vbuffer: vec![0; (web_bindings::Screen::WIDTH * web_bindings::Screen::HEIGHT * 3) as usize],
             abuffer: [io_device::WheelSoundRegister::new(); 4],
             ibuffer: Box::new(ibuffer),
+            fbuffer: Vec::new(),
+            file_flag: false,
         }
     }
     fn update(&mut self) {
         self.screen.display_screen(&self.vbuffer);
         self.speaker.set_registers(&self.abuffer);
+        if self.file_flag {
+            if let Some(file) = self.file_io.read_file() {
+                self.fbuffer = file;
+                self.file_flag = false;
+            }
+        }
     }
     fn in_screen(x: i32, y: i32) -> bool {
         x >= 0 && y >= 0 && (x as u32) < web_bindings::Screen::WIDTH && (y as u32) < web_bindings::Screen::HEIGHT
@@ -71,6 +81,9 @@ pub trait WheelInterface {
     fn get_buttons(&self) -> [u8; 4];
     fn get_keys(&self) -> [u8; 4];
     fn get_mouse(&self) -> io_device::MouseData;
+    fn upload_file(&mut self);
+    fn read_file(&mut self) -> Vec<u8>;
+    fn save_file(&mut self, name: &str, data: Vec<u8>);
 }
 
 impl WheelInterface for WheelContext {
@@ -103,6 +116,16 @@ impl WheelInterface for WheelContext {
     }
     fn get_mouse(&self) -> io_device::MouseData {
         self.ibuffer.get_input().mouse
+    }
+    fn upload_file(&mut self) {
+        self.file_io.upload_file();
+        self.file_flag = true;
+    }
+    fn read_file(&mut self) -> Vec<u8> {
+        self.fbuffer.clone()
+    }
+    fn save_file(&mut self, name: &str, data: Vec<u8>) {
+        self.file_io.write_file(name, &data);
     }
 }
 
@@ -238,5 +261,12 @@ impl Wheel {
     pub fn update(&mut self) {
         self.program.update(&mut self.context);
         self.context.update();
+    }
+    pub fn file_test(&mut self) {
+        let data = self.context.read_file();
+        web_sys::console::log_1(&format!("读取到文件，大小：{} bytes", data.len()).into());
+    }
+    pub fn upload_file(&mut self) {
+        self.context.upload_file();
     }
 }

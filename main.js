@@ -33,9 +33,44 @@ export function main() {
         button.remove();
     }
     const wheel = Wheel.new();
+    window.wheel = wheel;
     start_loop(() => {
         wheel.update();
     });
 }
 
 window.buttonCallback = main;
+
+window.fileData = null;
+        
+async function loadFile() {
+    const fileInput = document.querySelector('input');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('请选择文件');
+        return;
+    }
+    
+    // 读取文件为ArrayBuffer
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // 将ArrayBuffer转换为Uint8Array并存储
+        const arrayBuffer = e.target.result;
+        window.fileData = new Uint8Array(arrayBuffer);
+        console.log('文件已加载，大小:', window.fileData.length, '字节');
+        
+        // 触发Rust处理（可选）
+        if (window.processFileInRust) {
+            window.processFileInRust();
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+window.loadFile = loadFile;
+
+// 提供给Rust调用的方法，用于获取文件数据
+window.getFileData = function() {
+    return window.fileData;
+};
