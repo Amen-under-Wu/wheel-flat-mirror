@@ -1,6 +1,6 @@
 use web_sys::WebGl2RenderingContext as GL;
 use wasm_bindgen::JsCast;
-use crate::io_device::*;
+use crate::io_device::{self, *};
 
 pub struct Screen {
     gl: GL,
@@ -143,7 +143,7 @@ impl PlayRegister for DummySpeaker {
     }
 }
 
-use wasm_bindgen::prelude::*;
+//use wasm_bindgen::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::{HashSet, HashMap};
@@ -352,5 +352,40 @@ impl GetInput for Rc<RefCell<InputDevice>> {
             res.key[i] = key_code_vec[i];
         }
         res
+    }
+}
+
+pub struct FileDevice {}
+
+impl FileDevice {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl io_device::FileIO for FileDevice {
+    fn read_file(&self) -> Option<Vec<u8>> {
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        let input = document.create_element("input").unwrap().dyn_into::<web_sys::HtmlInputElement>().unwrap();
+        input.set_type("file");
+        input.click();
+        let file_list = input.files()?;
+        let file = file_list.get(0)?;
+        let reader = web_sys::FileReaderSync::new().ok()?;
+        let result = reader.read_as_array_buffer(&file).ok()?;
+        Some(result.dyn_into::<js_sys::Uint8Array>().ok()?.to_vec())
+    }
+    fn write_file(&self, path: &str, data: &[u8]) -> bool {
+        let blob = web_sys::Blob::new_with_u8_array_sequence(&js_sys::Array::of1(&js_sys::Uint8Array::from(data))).unwrap();
+        let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap();
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        let a = document.create_element("a").unwrap().dyn_into::<web_sys::HtmlAnchorElement>().unwrap();
+        a.set_href(&url);
+        a.set_download(path);
+        a.click();
+        web_sys::Url::revoke_object_url(&url).unwrap();
+        true
     }
 }

@@ -4,6 +4,7 @@ use js_sys::{Function, Reflect};
 use crate::{
     cartridge::CartContext,
     system::SystemContext,
+    wheel_file::{WheelFile, Savable, Chunk, ChunkType},
 };
 use std::{
     rc::Rc,
@@ -11,6 +12,7 @@ use std::{
 };
 
 pub struct JsScript {
+    data: WheelFile,
     script: String,
     system: Option<Rc<RefCell<SystemContext>>>,
 }
@@ -22,11 +24,42 @@ impl JsScript {
             .dyn_into::<Function>().unwrap();
         eval.call1(&JsValue::NULL, &JsValue::from_str(include_str!("js_prelude.js"))).unwrap();
         Self {
+            data: WheelFile { chunks: Vec::new() },
             script: String::new(),
             system: None,
         }
     }
 }
+
+impl Savable for JsScript {
+    fn save(&self) -> WheelFile {
+        let mut file = self.data.clone();
+        file.chunks.push(Chunk {
+            chunk_type: ChunkType::Code,
+            bank: 0,
+            data: self.script.as_bytes().to_vec(),
+        });
+        file
+    }
+
+    fn load(data: WheelFile) -> Self {
+        let mut script = String::new();
+        let mut script_data = WheelFile { chunks: Vec::new() };
+        for chunk in data.chunks {
+            if let ChunkType::Code = chunk.chunk_type {
+                script.push_str(std::str::from_utf8(&chunk.data).unwrap_or(""));
+            } else {
+                script_data.chunks.push(chunk);
+            }
+        }
+        Self {
+            data: script_data,
+            script,
+            system: None,
+        }
+    }
+}
+
 
 impl WheelScript for JsScript {
     fn bind(&mut self, cart: Rc<RefCell<CartContext>>, system: Rc<RefCell<SystemContext>>) {

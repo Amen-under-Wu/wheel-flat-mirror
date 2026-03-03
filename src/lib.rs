@@ -5,6 +5,7 @@ mod system;
 mod web_bindings;
 mod script;
 mod wrapper;
+mod wheel_file;
 
 
 use web_sys::WebGl2RenderingContext as GL;
@@ -18,6 +19,7 @@ use crate::script::WheelScript;
 struct WheelContext {
     screen: Box<dyn io_device::Display>,
     speaker: Box<dyn io_device::PlayRegister>,
+    file_io: Box<dyn io_device::FileIO>,
     vbuffer: Vec<u8>,
     abuffer: [io_device::WheelSoundRegister; 4],
     ibuffer: Box<dyn io_device::GetInput>,
@@ -47,6 +49,7 @@ impl WheelContext {
         Self {
             screen: Box::new(screen),
             speaker: Box::new(web_bindings::DummySpeaker::new()),
+            file_io: Box::new(web_bindings::FileDevice::new()),
             vbuffer: vec![0; (web_bindings::Screen::WIDTH * web_bindings::Screen::HEIGHT * 3) as usize],
             abuffer: [io_device::WheelSoundRegister::new(); 4],
             ibuffer: Box::new(ibuffer),

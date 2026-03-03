@@ -45,4 +45,11 @@ features = [
     "KeyboardEvent",
     "WheelEvent",
     "Gamepad",
+    "Url",
+    "Blob",
+    "HtmlAnchorElement",
+    "HtmlInputElement",
+    "FileReaderSync",
+    "FileList",
+    "File",
 ]

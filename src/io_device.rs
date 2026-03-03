@@ -62,3 +62,8 @@ impl WheelInputBuffer {
 pub trait GetInput {
     fn get_input(&self) -> WheelInputBuffer;
 }
+
+pub trait FileIO {
+    fn read_file(&self) -> Option<Vec<u8>>;
+    fn write_file(&self, path: &str, data: &[u8]) -> bool;
+}
