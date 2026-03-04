@@ -1,5 +1,9 @@
 pub mod js;
 
+pub enum Types {
+    Js,
+}
+
 use crate::{
     cartridge::CartContext,
     system::SystemContext,

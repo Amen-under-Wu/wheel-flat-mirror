@@ -1,5 +1,5 @@
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChunkType {
     Tiles = 1,
     Sprites = 2,
@@ -29,6 +29,9 @@ pub struct WheelFile {
 }
 
 impl WheelFile {
+    pub fn new() -> Self {
+        WheelFile { chunks: Vec::new() }
+    }
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let mut chunks = Vec::new();
         let mut offset = 0;
@@ -80,6 +83,25 @@ impl WheelFile {
         }
 
         bytes
+    }
+
+    pub fn get_chunk(&self, chunk_type: ChunkType, bank: u8) -> Option<&Chunk> {
+        self.chunks.iter().find(|chunk| {
+            chunk.chunk_type == chunk_type && chunk.bank == bank
+        })
+    }
+    pub fn set_chunk(&mut self, chunk_type: ChunkType, bank: u8, data: Vec<u8>) {
+        if let Some(chunk) = self.chunks.iter_mut().find(|chunk| {
+            chunk.chunk_type == chunk_type && chunk.bank == bank
+        }) {
+            chunk.data = data;
+        } else {
+            self.chunks.push(Chunk {
+                chunk_type,
+                bank,
+                data,
+            });
+        }
     }
 }
 

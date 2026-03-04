@@ -71,7 +71,9 @@ impl WheelWrapper {
                     self.programs["demo"].borrow_mut().init(self.cart.clone(), self.system.clone());
                     self.program = Some(self.programs["demo"].clone());
                 },
-                "save" => self.file_buffer = self.programs["demo"].borrow().to_file().unwrap_or_default(),
+                "save" => {
+                    self.file_buffer = self.programs["demo"].borrow().to_file().unwrap_or_default();
+                },
                 _ => {
                     self.system.borrow_mut().lines.push("未知命令".to_string());
                 },
@@ -240,8 +242,7 @@ impl crate::WheelProgram for WheelWrapper {
         self.cart.borrow_mut().poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
 
         // draw screen
-        let x = self.cart.borrow_mut().active_bank.clone();
-        self.cart.borrow_mut().ram[x].set_active_vbank(0);
+        self.cart.borrow_mut().ram.set_active_vbank(0);
         self.self_update();
         for i in 0..Self::BORDER_H {
             if let Some(prog) = &self.program {
@@ -291,8 +292,7 @@ impl crate::WheelProgram for WheelWrapper {
             }
         }
 
-        let x = self.cart.borrow_mut().active_bank.clone();
-        self.cart.borrow_mut().ram[x].set_active_vbank(1);
+        self.cart.borrow_mut().ram.set_active_vbank(1);
         if let Some(prog) = &self.program {
             prog.borrow_mut().overlay();
         }

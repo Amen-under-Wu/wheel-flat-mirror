@@ -1,67 +1,68 @@
 pub mod ram;
 pub mod pix_mask;
-use crate::cartridge::ram::{Vram, Ram};
-use crate::cartridge::pix_mask::PixMask;
+use crate::{
+    cartridge::{ram::{Vram, Ram}, pix_mask::PixMask},
+    wheel_file::{WheelFile, ChunkType},
+};
 use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
+
 
 pub struct CartContext {
-    pub ram: Vec<Ram>,
-    pub active_bank: usize,
+    pub ram: Ram,
     clip_rect: (i32, i32, i32, i32),
     pub key_timer: HashMap<u8, u32>,
     pub btn_timer: [i32; 32],
     ch_font: (Vec<u8>, Vec<u8>),
+    pub file_data: WheelFile,
 }
 
 impl CartContext {
     const BANK_N: usize = 8;
     pub fn new() -> Self {
         Self {
-            ram: std::iter::repeat_with(|| Ram::new()).take(Self::BANK_N).collect(),
-            active_bank: 0,
+            ram: Ram::new(),
             clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
             key_timer: HashMap::new(),
             btn_timer: [0; 32],
             ch_font: crate::data::ch_font(),
+            file_data: WheelFile::new(),
         }
     }
 
     pub fn get_subpix_map_mut(&mut self) -> &mut PixMask {
-        self.ram[self.active_bank].get_subpixels_mut()
+        self.ram.get_subpixels_mut()
     }
 
     // memory manipulations
 
     pub fn memcpy(&mut self, from: usize, to: usize, length: usize) {
-        let buffer: Vec<u8> = (from..from + length).into_iter().map(|x| self.ram[self.active_bank][x]).collect();
+        let buffer: Vec<u8> = (from..from + length).into_iter().map(|x| self.ram[x]).collect();
         for i in 0..length {
-            self.ram[self.active_bank][to + i] = buffer[i];
+            self.ram[to + i] = buffer[i];
         }
     }
     pub fn memset(&mut self, addr: usize, value: u8, length: usize) {
         for i in 0..length {
-            self.ram[self.active_bank][addr + i] = value;
+            self.ram[addr + i] = value;
         }
     }
     pub fn peek_with_bits(&self, addr: usize, bits: usize) -> u8 {
-        (self.ram[self.active_bank][addr * bits / 8] >> (bits * (addr % (8 / bits)))) & ((1u16 << bits) - 1) as u8
+        (self.ram[addr * bits / 8] >> (bits * (addr % (8 / bits)))) & ((1u16 << bits) - 1) as u8
     }
     pub fn peek(&self, addr: usize) -> u8 {
-        self.ram[self.active_bank][addr]
+        self.ram[addr]
     }
     pub fn peek4(&self, addr: usize) -> u8 {
-        (self.ram[self.active_bank][addr / 2] >> (4 * (addr % 2))) & 0xf
+        (self.ram[addr / 2] >> (4 * (addr % 2))) & 0xf
     }
     pub fn peek2(&self, addr: usize) -> u8 {
-        (self.ram[self.active_bank][addr / 4] >> (2 * (addr % 4))) & 0b11
+        (self.ram[addr / 4] >> (2 * (addr % 4))) & 0b11
     }
     pub fn peek1(&self, addr: usize) -> u8 {
-        (self.ram[self.active_bank][addr / 8] >> (1 * (addr % 8))) & 0b1
+        (self.ram[addr / 8] >> (1 * (addr % 8))) & 0b1
     }
     pub fn poke_with_bits(&mut self, addr: usize, val: u8, bits: usize) {
-        let byte_borrow = &mut self.ram[self.active_bank][addr * bits / 8];
+        let byte_borrow = &mut self.ram[addr * bits / 8];
         let bit_offset = ((addr % (8 / bits)) * bits) as u8;
         let mask: u8 = ((((1u16 << bits) - 1) as u8) << bit_offset) ^ 0xff;
         let val_mask = val << bit_offset;
@@ -69,7 +70,7 @@ impl CartContext {
         *byte_borrow |= val_mask;
     }
     pub fn poke(&mut self, addr: usize, val: u8) {
-        self.ram[self.active_bank][addr] = val;
+        self.ram[addr] = val;
     }
     pub fn poke4(&mut self, addr: usize, val: u8) {
         self.poke_with_bits(addr, val, 4);
@@ -85,7 +86,7 @@ impl CartContext {
             let addr = Ram::PERSISTENT_MEMORY_OFFSET + 4 * index;
             let mut res: i32 = 0;
             for i in 0..4 {
-                res |= (self.ram[self.active_bank][addr + i] as i32) << (i * 8);
+                res |= (self.ram[addr + i] as i32) << (i * 8);
             }
             res
         } else {
@@ -97,8 +98,8 @@ impl CartContext {
             let addr = Ram::PERSISTENT_MEMORY_OFFSET + 4 * index;
             let mut res: i32 = 0;
             for i in 0..4 {
-                res |= (self.ram[self.active_bank][addr + i] as i32) << (i * 8);
-                self.ram[self.active_bank][addr + i] = ((val >> (i * 8)) & 0xff) as u8;
+                res |= (self.ram[addr + i] as i32) << (i * 8);
+                self.ram[addr + i] = ((val >> (i * 8)) & 0xff) as u8;
             }
             res
         } else {
@@ -107,7 +108,7 @@ impl CartContext {
     }
     pub fn vbank(&mut self, id: usize) {
         if id < Vram::VBANK_N {
-            self.ram[self.active_bank].set_active_vbank(id);
+            self.ram.set_active_vbank(id);
         }
     }
 
@@ -749,6 +750,114 @@ impl CartContext {
         let y = self.peek(Ram::MOUSE_OFFSET + 1) as u8;
         let res: u16 = self.peek(Ram::MOUSE_OFFSET + 2) as u16 | ((self.peek(Ram::MOUSE_OFFSET + 3) as u16) << 8);
         (x, y, (res & 1) != 0, (res & 2) != 0, (res & 4) != 0, ((res >> 1) as i8) >> 2, ((res >> 7) as i8) >> 2)
+    }
+
+    fn load_from_cart(&mut self, mask: u8, bank: u8) {
+        if (mask & 1) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Tiles, bank) {
+                for i in 0..data.data.len().min(Ram::TILES_BYTE_SIZE) {
+                    self.ram[Ram::TILES_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 2) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Sprites, bank) {
+                for i in 0..data.data.len().min(Ram::SPRITES_BYTE_SIZE) {
+                    self.ram[Ram::SPRITES_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 4) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Map, bank) {
+                for i in 0..data.data.len().min(Ram::MAP_BYTE_SIZE) {
+                    self.ram[Ram::MAP_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 8) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Sfx, bank) {
+                for i in 0..data.data.len().min(Ram::SFX_BYTE_SIZE) {
+                    self.ram[Ram::SFX_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 16) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Music, bank) {
+                for i in 0..data.data.len().min(Ram::MUSIC_TRACKS_BYTE_SIZE) {
+                    self.ram[Ram::MUSIC_TRACKS_OFFSET + i] = data.data[i];
+                }
+            }
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Patterns, bank) {
+                for i in 0..data.data.len().min(Ram::MUSIC_PATTERNS_BYTE_SIZE) {
+                    self.ram[Ram::MUSIC_PATTERNS_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 32) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Palette, bank) {
+                for i in 0..data.data.len().min(Vram::PALETTE_BYTE_SIZE) {
+                    self.ram[Vram::PALETTE_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 64) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Flags, bank) {
+                for i in 0..data.data.len().min(Ram::SPRITE_FLAGS_BYTE_SIZE) {
+                    self.ram[Ram::SPRITE_FLAGS_OFFSET + i] = data.data[i];
+                }
+            }
+        }
+        if (mask & 128) != 0 {
+            if let Some(data) = self.file_data.get_chunk(ChunkType::Screen, bank) {
+                for i in 0..data.data.len().min(Vram::SCREEN_BYTE_SIZE) {
+                    self.ram[i] = data.data[i];
+                }
+            }
+        }
+    }
+    fn save_to_cart(&mut self, mask: u8, bank: u8) {
+        if (mask & 1) != 0 {
+            let data = (0..Ram::TILES_BYTE_SIZE).map(|i| self.ram[Ram::TILES_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Tiles, bank, data);
+        }
+        if (mask & 2) != 0 {
+            let data = (0..Ram::SPRITES_BYTE_SIZE).map(|i| self.ram[Ram::SPRITES_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Sprites, bank, data);
+        }
+        if (mask & 4) != 0 {
+            let data = (0..Ram::MAP_BYTE_SIZE).map(|i| self.ram[Ram::MAP_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Map, bank, data);
+        }
+        if (mask & 8) != 0 {
+            let data = (0..Ram::SFX_BYTE_SIZE).map(|i| self.ram[Ram::SFX_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Sfx, bank, data);
+        }
+        if (mask & 16) != 0 {
+            let data = (0..Ram::MUSIC_TRACKS_BYTE_SIZE).map(|i| self.ram[Ram::MUSIC_TRACKS_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Music, bank, data);
+            let data = (0..Ram::MUSIC_PATTERNS_BYTE_SIZE).map(|i| self.ram[Ram::MUSIC_PATTERNS_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Patterns, bank, data);
+        }
+        if (mask & 32) != 0 {
+            let data = (0..Vram::PALETTE_BYTE_SIZE).map(|i| self.ram[Vram::PALETTE_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Palette, bank, data);
+        }
+        if (mask & 64) != 0 {
+            let data = (0..Ram::SPRITE_FLAGS_BYTE_SIZE).map(|i| self.ram[Ram::SPRITE_FLAGS_OFFSET + i]).collect();
+            self.file_data.set_chunk(ChunkType::Flags, bank, data);
+        }
+        if (mask & 128) != 0 {
+            let data = (0..Vram::SCREEN_BYTE_SIZE).map(|i| self.ram[i]).collect();
+            self.file_data.set_chunk(ChunkType::Screen, bank, data);
+        }
+    }
+    pub fn sync(&mut self, mask: u8, bank: u8, to_cart: bool) {
+        let mask = if mask == 0 { 0b11111111 } else { mask };
+        if to_cart {
+            self.save_to_cart(mask, bank);
+        } else {
+            self.load_from_cart(mask, bank);
+        }
     }
 }
 
