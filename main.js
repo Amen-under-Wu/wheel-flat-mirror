@@ -28,10 +28,7 @@ export function start_loop(test_func) {
 window.start_loop = start_loop;
 
 export function main() {
-    const button = document.querySelector("button");
-    if (button) {
-        button.remove();
-    }
+    document.querySelector("canvas").focus();
     const wheel = Wheel.new();
     window.wheel = wheel;
     start_loop(() => {

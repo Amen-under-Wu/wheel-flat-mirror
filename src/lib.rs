@@ -35,8 +35,9 @@ impl WheelContext {
             .expect("canvas element not found")
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .unwrap();
-        canvas.set_width((240 + 16) * 4);
-        canvas.set_height((136 + 8) * 4);
+        let ratio = 800 / (240 + 16);
+        canvas.set_width((240 + 16) * ratio);
+        canvas.set_height((136 + 8) * ratio);
         let gl = canvas
             .get_context("webgl2")
             .unwrap()

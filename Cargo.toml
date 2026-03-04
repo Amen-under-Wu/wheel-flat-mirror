@@ -53,4 +53,5 @@ features = [
     "FileReaderSync",
     "FileList",
     "File",
+    "CssStyleDeclaration",
 ]
