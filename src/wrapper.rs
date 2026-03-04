@@ -1,16 +1,12 @@
 use crate::{
-    system::SystemContext,
     cartridge::{
         CartContext,
-        ram::{Vram, Ram},
+        ram::{Ram, Vram},
     },
+    system::SystemContext,
 };
 use js_sys::Date;
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    collections::HashMap,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 pub struct WheelWrapper {
     cart: Rc<RefCell<CartContext>>,
@@ -44,11 +40,29 @@ impl WheelWrapper {
         }
         self.cart.borrow_mut().cls(0);
         for i in self.system.borrow().top_line..self.system.borrow().lines.len() {
-            self.cart.borrow_mut().print_ch(&self.system.borrow().lines[i], 0, (i - self.system.borrow().top_line) as i32 * 9, 13, true, 1, false);
+            self.cart.borrow_mut().print_ch(
+                &self.system.borrow().lines[i],
+                0,
+                (i - self.system.borrow().top_line) as i32 * 9,
+                13,
+                true,
+                1,
+                false,
+            );
         }
-        let input_lines = SystemContext::split_line(&(">".to_string() + &self.system.borrow().input_buffer));
+        let input_lines =
+            SystemContext::split_line(&(">".to_string() + &self.system.borrow().input_buffer));
         for i in 0..input_lines.len() {
-            self.cart.borrow_mut().print_ch(&input_lines[i], 0, (self.system.borrow().lines.len() - self.system.borrow().top_line) as i32 * 9 + i as i32 * 9, 13, true, 1, false);
+            self.cart.borrow_mut().print_ch(
+                &input_lines[i],
+                0,
+                (self.system.borrow().lines.len() - self.system.borrow().top_line) as i32 * 9
+                    + i as i32 * 9,
+                13,
+                true,
+                1,
+                false,
+            );
         }
         //context.print_ch(, 0, (self_context.lines.len() - self_context.top_line) as i32 * 9, 13, true, 1, false);
         if self.cart.borrow().keyp(Some(62)) {
@@ -63,20 +77,22 @@ impl WheelWrapper {
             self.system.borrow_mut().lines.extend(input_lines);
             let in_str = self.system.borrow().input_buffer.clone();
             match in_str.as_str() {
-                "" => {},
+                "" => {}
                 "clear" => self.system.borrow_mut().lines.clear(),
                 "cls" => self.system.borrow_mut().lines.clear(),
                 "run" => {
                     self.system.borrow_mut().program_timer = Date::now() as u64;
-                    self.programs["demo"].borrow_mut().init(self.cart.clone(), self.system.clone());
+                    self.programs["demo"]
+                        .borrow_mut()
+                        .init(self.cart.clone(), self.system.clone());
                     self.program = Some(self.programs["demo"].clone());
-                },
+                }
                 "save" => {
                     self.file_buffer = self.programs["demo"].borrow().to_file().unwrap_or_default();
-                },
+                }
                 _ => {
                     self.system.borrow_mut().lines.push("未知命令".to_string());
-                },
+                }
             }
             self.system.borrow_mut().input_buffer.clear();
             self.system.borrow_mut().scroll_to_bottom();
@@ -102,24 +118,98 @@ impl WheelWrapper {
     fn get_char(&self) -> Option<char> {
         const KEYBOARD_OFFSET: usize = crate::cartridge::ram::Ram::KEYBOARD_OFFSET;
         const NUM_SHIFTS: [char; 10] = [')', '!', '@', '#', '$', '%', '^', '&', '*', '('];
-        let keys: Vec<u8> = (0..4).map(|i| self.cart.borrow().peek(KEYBOARD_OFFSET + i)).collect();
+        let keys: Vec<u8> = (0..4)
+            .map(|i| self.cart.borrow().peek(KEYBOARD_OFFSET + i))
+            .collect();
         let shift = keys.contains(&64) || self.system.borrow().capslock;
         for i in keys {
             if self.cart.borrow().keyp_with_hold_period(i, 60, 5) {
                 let c = match i {
                     1..=26 => (i - 1 + if shift { b'A' } else { b'a' }) as char,
-                    27..=36 => if shift { NUM_SHIFTS[(i - 27) as usize] } else { (i - 27 + b'0') as char },
-                    37 => if shift { '_' } else { '-' },
-                    38 => if shift { '+' } else { '=' },
-                    39 => if shift { '{' } else { '[' },
-                    40 => if shift { '}' } else { ']' },
-                    41 => if shift { '|' } else { '\\' },
-                    42 => if shift { ':' } else { ';' },
-                    43 => if shift { '"' } else { '\'' },
-                    44 => if shift { '~' } else { '`' },
-                    45 => if shift { '<' } else { ',' },
-                    46 => if shift { '>' } else { '.' },
-                    47 => if shift { '?' } else { '/' },
+                    27..=36 => {
+                        if shift {
+                            NUM_SHIFTS[(i - 27) as usize]
+                        } else {
+                            (i - 27 + b'0') as char
+                        }
+                    }
+                    37 => {
+                        if shift {
+                            '_'
+                        } else {
+                            '-'
+                        }
+                    }
+                    38 => {
+                        if shift {
+                            '+'
+                        } else {
+                            '='
+                        }
+                    }
+                    39 => {
+                        if shift {
+                            '{'
+                        } else {
+                            '['
+                        }
+                    }
+                    40 => {
+                        if shift {
+                            '}'
+                        } else {
+                            ']'
+                        }
+                    }
+                    41 => {
+                        if shift {
+                            '|'
+                        } else {
+                            '\\'
+                        }
+                    }
+                    42 => {
+                        if shift {
+                            ':'
+                        } else {
+                            ';'
+                        }
+                    }
+                    43 => {
+                        if shift {
+                            '"'
+                        } else {
+                            '\''
+                        }
+                    }
+                    44 => {
+                        if shift {
+                            '~'
+                        } else {
+                            '`'
+                        }
+                    }
+                    45 => {
+                        if shift {
+                            '<'
+                        } else {
+                            ','
+                        }
+                    }
+                    46 => {
+                        if shift {
+                            '>'
+                        } else {
+                            '.'
+                        }
+                    }
+                    47 => {
+                        if shift {
+                            '?'
+                        } else {
+                            '/'
+                        }
+                    }
                     48 => ' ',
                     49 => '\t',
                     79..=88 => (i - 79 + b'0') as char,
@@ -183,8 +273,12 @@ impl crate::WheelProgram for WheelWrapper {
         }
         btns[0] |= gamepad_map;
         for i in 0..4 {
-            self.cart.borrow_mut().poke(Ram::GAMEPADS_OFFSET + i, btns[i]);
-            self.cart.borrow_mut().poke(Ram::KEYBOARD_OFFSET + i, keys[i]);
+            self.cart
+                .borrow_mut()
+                .poke(Ram::GAMEPADS_OFFSET + i, btns[i]);
+            self.cart
+                .borrow_mut()
+                .poke(Ram::KEYBOARD_OFFSET + i, keys[i]);
         }
 
         // use direct input to update, instead of ram data
@@ -214,32 +308,43 @@ impl crate::WheelProgram for WheelWrapper {
             }
         }
         let mouse = wheel.get_mouse();
-        let mut mouse_x = 
-            if mouse.x > (Self::BORDER_W * 2) as i32 && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32 {
-                mouse.x / 2 - Self::BORDER_W as i32
-            } else {
-                -1
-            };
-        let mut mouse_y = 
-            if mouse.y > (Self::BORDER_H * 2) as i32 && mouse.y <= 2 * (Vram::SCREEN_HEIGHT + 2 * Self::BORDER_H) as i32 {
-                mouse.y / 2 - Self::BORDER_H as i32
-            } else {
-                -1
-            };
+        let mut mouse_x = if mouse.x > (Self::BORDER_W * 2) as i32
+            && mouse.x <= 2 * (Vram::SCREEN_WIDTH + 2 * Self::BORDER_W) as i32
+        {
+            mouse.x / 2 - Self::BORDER_W as i32
+        } else {
+            -1
+        };
+        let mut mouse_y = if mouse.y > (Self::BORDER_H * 2) as i32
+            && mouse.y <= 2 * (Vram::SCREEN_HEIGHT + 2 * Self::BORDER_H) as i32
+        {
+            mouse.y / 2 - Self::BORDER_H as i32
+        } else {
+            -1
+        };
         if mouse_x == -1 || mouse_y == -1 {
             mouse_x = -1;
             mouse_y = -1;
         }
-        self.cart.borrow_mut().poke(Ram::MOUSE_OFFSET, mouse_x as u8);
-        self.cart.borrow_mut().poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
+        self.cart
+            .borrow_mut()
+            .poke(Ram::MOUSE_OFFSET, mouse_x as u8);
+        self.cart
+            .borrow_mut()
+            .poke(Ram::MOUSE_OFFSET + 1, mouse_y as u8);
         const SCROLL_FACTOR: i32 = 50;
-        let mut mouse_lw: u16 = mouse.left as u16 | ((mouse.middle as u16) << 1) | ((mouse.right as u16) << 2);
+        let mut mouse_lw: u16 =
+            mouse.left as u16 | ((mouse.middle as u16) << 1) | ((mouse.right as u16) << 2);
         let scroll_x = mouse.scroll_x / SCROLL_FACTOR;
         let scroll_y = mouse.scroll_y / SCROLL_FACTOR;
         mouse_lw |= ((scroll_x & 0b111111) as u16) << 3;
         mouse_lw |= ((scroll_y & 0b111111) as u16) << 9;
-        self.cart.borrow_mut().poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
-        self.cart.borrow_mut().poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
+        self.cart
+            .borrow_mut()
+            .poke(Ram::MOUSE_OFFSET + 2, mouse_lw as u8);
+        self.cart
+            .borrow_mut()
+            .poke(Ram::MOUSE_OFFSET + 3, (mouse_lw >> 8) as u8);
 
         // draw screen
         self.cart.borrow_mut().ram.set_active_vbank(0);
@@ -259,7 +364,8 @@ impl crate::WheelProgram for WheelWrapper {
             }
             let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
             let x_offset: i32 = (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
-            let y_offset: i32 = (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
+            let y_offset: i32 =
+                (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
             let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
             for xx in 0..Vram::SCREEN_WIDTH {
                 let color = palette[self.cart.borrow().peek4(i * Vram::SCREEN_WIDTH + xx) as usize];
@@ -269,7 +375,11 @@ impl crate::WheelProgram for WheelWrapper {
                 if let Some(arr) = subpix {
                     let mut colors = [0; 4];
                     for j in 0..4 {
-                        colors[j] = if arr[j] < 16 { palette[arr[j] as usize] } else { 0xFFFFFFFF };
+                        colors[j] = if arr[j] < 16 {
+                            palette[arr[j] as usize]
+                        } else {
+                            0xFFFFFFFF
+                        };
                     }
                     draw_sub_pixel(wheel, x, y, colors);
                 }
@@ -300,19 +410,24 @@ impl crate::WheelProgram for WheelWrapper {
         let trans_color = self.cart.borrow().peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
         let x_offset: i32 = (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
         let y_offset: i32 = (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET + 1) as i8).into();
-        for i in 0..Vram::SCREEN_HEIGHT{
+        for i in 0..Vram::SCREEN_HEIGHT {
             let y = (i as i32 + y_offset) % Vram::SCREEN_HEIGHT as i32 + Self::BORDER_H as i32;
             for xx in 0..Vram::SCREEN_WIDTH {
                 let color_id = self.cart.borrow().peek4(i * Vram::SCREEN_WIDTH + xx);
                 if color_id != trans_color {
                     let color = palette[color_id as usize];
-                    let x = (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
+                    let x =
+                        (xx as i32 + x_offset) % Vram::SCREEN_WIDTH as i32 + Self::BORDER_W as i32;
                     draw_fat_pixel(wheel, x, y, color);
                     let subpix = self.cart.borrow_mut().get_subpix_map_mut().get(xx, i);
                     if let Some(arr) = subpix {
                         let mut colors = [0; 4];
                         for j in 0..4 {
-                            colors[j] = if arr[j] < 16 { palette[arr[j] as usize] } else { 0xFFFFFFFF };
+                            colors[j] = if arr[j] < 16 {
+                                palette[arr[j] as usize]
+                            } else {
+                                0xFFFFFFFF
+                            };
                         }
                         draw_sub_pixel(wheel, x, y, colors);
                     }

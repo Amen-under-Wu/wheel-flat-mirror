@@ -4,14 +4,8 @@ pub enum Types {
     Js,
 }
 
-use crate::{
-    cartridge::CartContext,
-    system::SystemContext,
-};
-use std::{
-    rc::Rc,
-    cell::RefCell,
-};
+use crate::{cartridge::CartContext, system::SystemContext};
+use std::{cell::RefCell, rc::Rc};
 
 pub trait WheelScript {
     fn bind(&mut self, cart: Rc<RefCell<CartContext>>, system: Rc<RefCell<SystemContext>>);

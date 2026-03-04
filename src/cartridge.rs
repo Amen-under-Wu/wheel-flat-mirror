@@ -1,11 +1,13 @@
-pub mod ram;
 pub mod pix_mask;
+pub mod ram;
 use crate::{
-    cartridge::{ram::{Vram, Ram}, pix_mask::PixMask},
-    wheel_file::{WheelFile, ChunkType},
+    cartridge::{
+        pix_mask::PixMask,
+        ram::{Ram, Vram},
+    },
+    wheel_file::{ChunkType, WheelFile},
 };
 use std::collections::HashMap;
-
 
 pub struct CartContext {
     pub ram: Ram,
@@ -36,7 +38,10 @@ impl CartContext {
     // memory manipulations
 
     pub fn memcpy(&mut self, from: usize, to: usize, length: usize) {
-        let buffer: Vec<u8> = (from..from + length).into_iter().map(|x| self.ram[x]).collect();
+        let buffer: Vec<u8> = (from..from + length)
+            .into_iter()
+            .map(|x| self.ram[x])
+            .collect();
         for i in 0..length {
             self.ram[to + i] = buffer[i];
         }
@@ -115,8 +120,10 @@ impl CartContext {
     // graphics
 
     fn in_clip(&self, x: i32, y: i32) -> bool {
-        x >= self.clip_rect.0 && x < self.clip_rect.0 + self.clip_rect.2
-            && y >= self.clip_rect.1 && y < self.clip_rect.1 + self.clip_rect.3
+        x >= self.clip_rect.0
+            && x < self.clip_rect.0 + self.clip_rect.2
+            && y >= self.clip_rect.1
+            && y < self.clip_rect.1 + self.clip_rect.3
     }
     pub fn clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
         self.clip_rect.0 = x.max(0);
@@ -180,7 +187,11 @@ impl CartContext {
         self.draw_while(y_start, y + h, color, &(|y| (x, y)));
     }
     pub fn line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: u8) {
-        let (x1, x2, y1, y2) = if x1 > x2 { (x2, x1, y2, y1) } else { (x1, x2, y1, y2) };
+        let (x1, x2, y1, y2) = if x1 > x2 {
+            (x2, x1, y2, y1)
+        } else {
+            (x1, x2, y1, y2)
+        };
         let dx = x2 - x1;
         let dy = y2 - y1;
         let mut xi = x1.floor();
@@ -191,7 +202,9 @@ impl CartContext {
                 while yi >= y2 {
                     self.set_pix(xi as i32, yi as i32, color);
                     yi -= 1.0;
-                    if -(dx * yi - dy * xi - dx * y1 + dy * x1) > dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1 {
+                    if -(dx * yi - dy * xi - dx * y1 + dy * x1)
+                        > dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1
+                    {
                         xi += 1.0;
                     }
                 }
@@ -199,7 +212,9 @@ impl CartContext {
                 while xi <= x2 {
                     self.set_pix(xi as i32, yi as i32, color);
                     xi += 1.0;
-                    if dx * yi - dy * xi - dx * y1 + dy * x1 > -(dx * (yi - 1.0) - dy * xi - dx * y1 + dy * x1) {
+                    if dx * yi - dy * xi - dx * y1 + dy * x1
+                        > -(dx * (yi - 1.0) - dy * xi - dx * y1 + dy * x1)
+                    {
                         yi -= 1.0;
                     }
                 }
@@ -210,7 +225,9 @@ impl CartContext {
                 while yi <= y2 {
                     self.set_pix(xi as i32, yi as i32, color);
                     yi += 1.0;
-                    if dx * yi - dy * xi - dx * y1 + dy * x1 > -(dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1) {
+                    if dx * yi - dy * xi - dx * y1 + dy * x1
+                        > -(dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1)
+                    {
                         xi += 1.0;
                     }
                 }
@@ -218,7 +235,9 @@ impl CartContext {
                 while xi <= x2 {
                     self.set_pix(xi as i32, yi as i32, color);
                     xi += 1.0;
-                    if -(dx * yi - dy * xi - dx * y1 + dy * x1) > dx * (yi + 1.0) - dy * xi - dx * y1 + dy * x1 {
+                    if -(dx * yi - dy * xi - dx * y1 + dy * x1)
+                        > dx * (yi + 1.0) - dy * xi - dx * y1 + dy * x1
+                    {
                         yi += 1.0;
                     }
                 }
@@ -313,27 +332,47 @@ impl CartContext {
         }
     }
     pub fn cls(&mut self, color: u8) {
-        for y in self.clip_rect.1 .. self.clip_rect.1 + self.clip_rect.3 {
-            for x in self.clip_rect.0 .. self.clip_rect.0 + self.clip_rect.2 {
+        for y in self.clip_rect.1..self.clip_rect.1 + self.clip_rect.3 {
+            for x in self.clip_rect.0..self.clip_rect.0 + self.clip_rect.2 {
                 self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
                 self.get_subpix_map_mut().del(x as usize, y as usize);
             }
         }
     }
 
-    fn putchar(&mut self, chr: u8, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
+    fn putchar(
+        &mut self,
+        chr: u8,
+        x: i32,
+        y: i32,
+        color: u8,
+        is_fixed: bool,
+        scale: i32,
+        alt_font: bool,
+    ) -> i32 {
         let chr: usize = (chr % 128).into(); // ascii characters only
-        let font_offset = if alt_font { Ram::ALT_FONT_OFFSET } else { Ram::SYSTEM_FONT_OFFSET };
+        let font_offset = if alt_font {
+            Ram::ALT_FONT_OFFSET
+        } else {
+            Ram::SYSTEM_FONT_OFFSET
+        };
         if is_fixed {
             for i in 0..8 {
                 let line_data = self.peek(font_offset + chr * 8 + i);
                 for j in 0..8 {
                     if ((line_data >> j) & 1) != 0 {
-                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + j as i32 * scale,
+                            y + i as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
             }
-            self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE).into()
+            self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE)
+                .into()
         } else {
             let mut chr_bin = [0; 8];
             let mut max_bit = 0;
@@ -350,18 +389,46 @@ impl CartContext {
             for i in 0..8 {
                 for j in 0..(8 - min_bit) {
                     if ((chr_bin[i] >> (j + min_bit)) & 1) != 0 {
-                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + j as i32 * scale,
+                            y + i as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
             }
-            scale * (if zero_flag { self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE) as i32 - 2 } else { max_bit - min_bit + 2 })
+            scale
+                * (if zero_flag {
+                    self.peek(font_offset + Ram::FONT_PARAM_OFFSET_RELATIVE) as i32 - 2
+                } else {
+                    max_bit - min_bit + 2
+                })
         }
     }
-    pub fn print(&mut self, text: &str, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
+    pub fn print(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        color: u8,
+        is_fixed: bool,
+        scale: i32,
+        alt_font: bool,
+    ) -> i32 {
         let mut text_width = 0;
         let mut x_offset = 0;
         let mut y = y;
-        let chr_height: i32 = scale * self.peek((if alt_font { Ram::ALT_FONT_OFFSET } else { Ram::SYSTEM_FONT_OFFSET }) + Ram::FONT_PARAM_OFFSET_RELATIVE + 1) as i32;
+        let chr_height: i32 = scale
+            * self.peek(
+                (if alt_font {
+                    Ram::ALT_FONT_OFFSET
+                } else {
+                    Ram::SYSTEM_FONT_OFFSET
+                }) + Ram::FONT_PARAM_OFFSET_RELATIVE
+                    + 1,
+            ) as i32;
         for &chr in text.as_bytes() {
             if chr == '\n' as u8 {
                 text_width = text_width.max(x_offset);
@@ -387,78 +454,155 @@ impl CartContext {
     }
     const SPR_PIX_ARR: [(usize, usize); Ram::SPRITE_W * Ram::SPRITE_H] = Self::spr_pix_arr();
     fn get_spr_pix(&self, id: usize, x: usize, y: usize, bpp: usize) -> u8 {
-        self.peek_with_bits(Ram::TILES_OFFSET * 8 / bpp + id * Ram::SPRITE_W * Ram::SPRITE_H + y * Ram::SPRITE_W + x, bpp)
+        self.peek_with_bits(
+            Ram::TILES_OFFSET * 8 / bpp
+                + id * Ram::SPRITE_W * Ram::SPRITE_H
+                + y * Ram::SPRITE_W
+                + x,
+            bpp,
+        )
     }
-    fn spr_mono_unchecked(&mut self, id: usize, x: i32, y: i32, trans_color: u8, scale: i32, flip: u8, rotate: u8, bpp: usize) {
+    fn spr_mono_unchecked(
+        &mut self,
+        id: usize,
+        x: i32,
+        y: i32,
+        trans_color: u8,
+        scale: i32,
+        flip: u8,
+        rotate: u8,
+        bpp: usize,
+    ) {
         match (rotate << 2) + flip {
             0 | 11 => {
                 for (i, j) in Self::SPR_PIX_ARR {
                     let color = self.get_spr_pix(id, j, i, bpp);
                     if color != trans_color {
-                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + j as i32 * scale,
+                            y + i as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             1 | 10 => {
                 for (i, j) in Self::SPR_PIX_ARR {
                     let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, i, bpp);
                     if color != trans_color {
-                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + j as i32 * scale,
+                            y + i as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             2 | 9 => {
                 for (i, j) in Self::SPR_PIX_ARR {
                     let color = self.get_spr_pix(id, j, Ram::SPRITE_H - i - 1, bpp);
                     if color != trans_color {
-                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + j as i32 * scale,
+                            y + i as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             3 | 8 => {
                 for (i, j) in Self::SPR_PIX_ARR {
-                    let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, Ram::SPRITE_H - i - 1, bpp);
+                    let color =
+                        self.get_spr_pix(id, Ram::SPRITE_W - j - 1, Ram::SPRITE_H - i - 1, bpp);
                     if color != trans_color {
-                        self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + j as i32 * scale,
+                            y + i as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             4 | 15 => {
                 for (i, j) in Self::SPR_PIX_ARR {
                     let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, i, bpp);
                     if color != trans_color {
-                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + i as i32 * scale,
+                            y + j as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             5 | 14 => {
                 for (i, j) in Self::SPR_PIX_ARR {
-                    let color = self.get_spr_pix(id, Ram::SPRITE_W - j - 1, Ram::SPRITE_H - i - 1, bpp);
+                    let color =
+                        self.get_spr_pix(id, Ram::SPRITE_W - j - 1, Ram::SPRITE_H - i - 1, bpp);
                     if color != trans_color {
-                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + i as i32 * scale,
+                            y + j as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             6 | 13 => {
                 for (i, j) in Self::SPR_PIX_ARR {
                     let color = self.get_spr_pix(id, j, i, bpp);
                     if color != trans_color {
-                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + i as i32 * scale,
+                            y + j as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             7 | 12 => {
                 for (i, j) in Self::SPR_PIX_ARR {
                     let color = self.get_spr_pix(id, j, Ram::SPRITE_H - i - 1, bpp);
                     if color != trans_color {
-                        self.rect(x + i as i32 * scale, y + j as i32 * scale, scale, scale, color);
+                        self.rect(
+                            x + i as i32 * scale,
+                            y + j as i32 * scale,
+                            scale,
+                            scale,
+                            color,
+                        );
                     }
                 }
-            },
+            }
             _ => (),
         }
     }
-    pub fn spr(&mut self, id: i32, x: i32, y: i32, trans_color: u8, scale: i32, flip: i32, rotate: i32, w: i32, h: i32) {
+    pub fn spr(
+        &mut self,
+        id: i32,
+        x: i32,
+        y: i32,
+        trans_color: u8,
+        scale: i32,
+        flip: i32,
+        rotate: i32,
+        w: i32,
+        h: i32,
+    ) {
         const N: i32 = (Ram::CANVAS_W * Ram::CANVAS_H) as i32;
         if id < 0 || id > N * 2 || w <= 0 || h <= 0 {
             return;
@@ -474,16 +618,88 @@ impl CartContext {
             }
             for j in 0..w {
                 match (rotate << 2) | flip {
-                    0 | 11 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + j * Ram::SPRITE_W as i32 * scale, y + i * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    1 | 10 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (w - j - 1) * Ram::SPRITE_W as i32 * scale, y + i * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    2 | 9 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + j * Ram::SPRITE_W as i32 * scale, y + (h - i - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    3 | 8 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (w - j - 1) * Ram::SPRITE_W as i32 * scale, y + (h - i - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    4 | 15 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + i * Ram::SPRITE_W as i32 * scale, y + (w - j - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    5 | 14 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (h - i - 1) * Ram::SPRITE_W as i32 * scale, y + (w - j - 1) * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    6 | 13 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + i * Ram::SPRITE_W as i32 * scale, y + j * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
-                    7 | 12 => self.spr_mono_unchecked(id + i as usize * Ram::CANVAS_W + j as usize, x + (h - i - 1) * Ram::SPRITE_W as i32 * scale, y + j * Ram::SPRITE_H as i32 * scale, trans_color, scale, flip, rotate, bpp),
+                    0 | 11 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + j * Ram::SPRITE_W as i32 * scale,
+                        y + i * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    1 | 10 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + (w - j - 1) * Ram::SPRITE_W as i32 * scale,
+                        y + i * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    2 | 9 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + j * Ram::SPRITE_W as i32 * scale,
+                        y + (h - i - 1) * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    3 | 8 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + (w - j - 1) * Ram::SPRITE_W as i32 * scale,
+                        y + (h - i - 1) * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    4 | 15 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + i * Ram::SPRITE_W as i32 * scale,
+                        y + (w - j - 1) * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    5 | 14 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + (h - i - 1) * Ram::SPRITE_W as i32 * scale,
+                        y + (w - j - 1) * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    6 | 13 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + i * Ram::SPRITE_W as i32 * scale,
+                        y + j * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
+                    7 | 12 => self.spr_mono_unchecked(
+                        id + i as usize * Ram::CANVAS_W + j as usize,
+                        x + (h - i - 1) * Ram::SPRITE_W as i32 * scale,
+                        y + j * Ram::SPRITE_H as i32 * scale,
+                        trans_color,
+                        scale,
+                        flip,
+                        rotate,
+                        bpp,
+                    ),
                     _ => (),
-                } 
+                }
             }
         }
     }
@@ -496,36 +712,84 @@ impl CartContext {
     }
     pub fn fset(&mut self, id: i32, flag_index: i32, value: bool) {
         if id >= 0 && id < 512 && flag_index >= 0 && flag_index < 8 {
-            self.poke1(Ram::SPRITE_FLAGS_OFFSET * 8 + id as usize * 8 + flag_index as usize, if value { 1 } else { 0 });
+            self.poke1(
+                Ram::SPRITE_FLAGS_OFFSET * 8 + id as usize * 8 + flag_index as usize,
+                if value { 1 } else { 0 },
+            );
         }
     }
 
     pub fn mget(&self, x: i32, y: i32) -> i32 {
         if x >= 0 && y >= 0 && x < Ram::MAP_W as i32 && y < Ram::MAP_H as i32 {
-            self.peek(Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize).into()
+            self.peek(Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize)
+                .into()
         } else {
             -1
         }
     }
     pub fn mset(&mut self, x: i32, y: i32, tile_id: u8) {
         if x >= 0 && y >= 0 && x < Ram::MAP_W as i32 && y < Ram::MAP_H as i32 {
-            self.poke(Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize, tile_id);
+            self.poke(
+                Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize,
+                tile_id,
+            );
         }
     }
-    pub fn map(&mut self, x: i32, y: i32, w: i32, h: i32, sx: i32, sy: i32, trans_color: u8, scale: i32) {
+    pub fn map(
+        &mut self,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        sx: i32,
+        sy: i32,
+        trans_color: u8,
+        scale: i32,
+    ) {
         // remap param to be added when wrapping to lua, not here
         // upd: adding remap requires rewriting the whole function in script lang. keep it in mind.
         for i in 0..h {
             for j in 0..w {
-                self.spr(self.mget(sx + j, sy + i), x + j * Ram::TILE_W as i32 * scale, y + i * Ram::TILE_H as i32 * scale, trans_color, scale, 0, 0, 1, 1);
+                self.spr(
+                    self.mget(sx + j, sy + i),
+                    x + j * Ram::TILE_W as i32 * scale,
+                    y + i * Ram::TILE_H as i32 * scale,
+                    trans_color,
+                    scale,
+                    0,
+                    0,
+                    1,
+                    1,
+                );
             } // maybe too much boundary checks?
         }
     }
-    pub fn map_with_remap(&mut self, x: i32, y: i32, w: i32, h: i32, sx: i32, sy: i32, trans_color: u8, scale: i32, remap: Box<dyn FnMut(i32, i32, i32) -> (i32, i32, i32)>) {
+    pub fn map_with_remap(
+        &mut self,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        sx: i32,
+        sy: i32,
+        trans_color: u8,
+        scale: i32,
+        remap: Box<dyn FnMut(i32, i32, i32) -> (i32, i32, i32)>,
+    ) {
         for i in 0..h {
             for j in 0..w {
                 let (id, flip, rotate) = remap(self.mget(sx + j, sy + i), sx + j, sy + i);
-                self.spr(id, x + j * Ram::TILE_W as i32 * scale, y + i * Ram::TILE_H as i32 * scale, trans_color, scale, flip, rotate, 1, 1);
+                self.spr(
+                    id,
+                    x + j * Ram::TILE_W as i32 * scale,
+                    y + i * Ram::TILE_H as i32 * scale,
+                    trans_color,
+                    scale,
+                    flip,
+                    rotate,
+                    1,
+                    1,
+                );
             }
         }
     }
@@ -535,16 +799,20 @@ impl CartContext {
     }
 
     pub fn tri(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, color: u8) {
-        let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32).min(self.clip_rect.0 + self.clip_rect.2 - 1);
+        let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32)
+            .min(self.clip_rect.0 + self.clip_rect.2 - 1);
         let x_min = (x1.floor().min(x2.floor()).min(x3.floor()) as i32).max(self.clip_rect.0);
-        let y_max = (y1.ceil().max(y2.ceil()).max(y3.ceil()) as i32).min(self.clip_rect.1 + self.clip_rect.3 - 1);
+        let y_max = (y1.ceil().max(y2.ceil()).max(y3.ceil()) as i32)
+            .min(self.clip_rect.1 + self.clip_rect.3 - 1);
         let y_min = (y1.floor().min(y2.floor()).min(y3.floor()) as i32).max(self.clip_rect.1);
         for y in y_min..=y_max {
             for x in x_min..=x_max {
                 let cross1 = Self::cross_mult(x1, y1, x2, y2, x as f32, y as f32);
                 let cross2 = Self::cross_mult(x2, y2, x3, y3, x as f32, y as f32);
                 let cross3 = Self::cross_mult(x3, y3, x1, y1, x as f32, y as f32);
-                if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0) || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0) {
+                if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0)
+                    || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0)
+                {
                     self.set_pix(x, y, color);
                 }
             }
@@ -560,32 +828,78 @@ impl CartContext {
     // therefore they look messy
     // original macros written in 2024.6.
     fn get_tile_pix(&self, x: i32, y: i32) -> u8 {
-        if x >= 0 && y >= 0 && x < (Ram::CANVAS_W * Ram::TILE_W) as i32 && y < (Ram::CANVAS_H * Ram::TILE_H) as i32 {
+        if x >= 0
+            && y >= 0
+            && x < (Ram::CANVAS_W * Ram::TILE_W) as i32
+            && y < (Ram::CANVAS_H * Ram::TILE_H) as i32
+        {
             let x = x as usize;
             let y = y as usize;
-            self.peek4(Ram::TILES_OFFSET * 2 + (y / Ram::TILE_H * Ram::CANVAS_W + x / Ram::TILE_W) * Ram::TILE_BYTE_SIZE * 2 + (y % Ram::TILE_H * Ram::TILE_W + x % Ram::TILE_W))
+            self.peek4(
+                Ram::TILES_OFFSET * 2
+                    + (y / Ram::TILE_H * Ram::CANVAS_W + x / Ram::TILE_W) * Ram::TILE_BYTE_SIZE * 2
+                    + (y % Ram::TILE_H * Ram::TILE_W + x % Ram::TILE_W),
+            )
         } else {
             255
         }
     }
     fn get_map_pix(&self, x: i32, y: i32) -> u8 {
-        if x >= 0 && y >= 0 && x < (Ram::MAP_W * Ram::TILE_W) as i32 && y < (Ram::MAP_H * Ram::TILE_H) as i32 {
+        if x >= 0
+            && y >= 0
+            && x < (Ram::MAP_W * Ram::TILE_W) as i32
+            && y < (Ram::MAP_H * Ram::TILE_H) as i32
+        {
             let x = x as usize;
             let y = y as usize;
-            self.peek4(Ram::TILES_OFFSET * 2 + self.peek(Ram::MAP_OFFSET + ((y % (Ram::TILE_H * Ram::MAP_H) + (Ram::TILE_H * Ram::MAP_H)) % (Ram::TILE_H * Ram::MAP_H)) / Ram::TILE_H * Ram::MAP_W + (((x) % (Ram::MAP_W * Ram::TILE_W) + (Ram::MAP_W * Ram::TILE_W)) % (Ram::MAP_W * Ram::TILE_W)) / Ram::TILE_W) as usize * Ram::TILE_BYTE_SIZE * 2 + (((y) % Ram::TILE_H + Ram::TILE_H) % Ram::TILE_H) * Ram::TILE_W + (((x) % Ram::TILE_W + Ram::TILE_W) % Ram::TILE_W))
+            self.peek4(
+                Ram::TILES_OFFSET * 2
+                    + self.peek(
+                        Ram::MAP_OFFSET
+                            + ((y % (Ram::TILE_H * Ram::MAP_H) + (Ram::TILE_H * Ram::MAP_H))
+                                % (Ram::TILE_H * Ram::MAP_H))
+                                / Ram::TILE_H
+                                * Ram::MAP_W
+                            + (((x) % (Ram::MAP_W * Ram::TILE_W) + (Ram::MAP_W * Ram::TILE_W))
+                                % (Ram::MAP_W * Ram::TILE_W))
+                                / Ram::TILE_W,
+                    ) as usize
+                        * Ram::TILE_BYTE_SIZE
+                        * 2
+                    + (((y) % Ram::TILE_H + Ram::TILE_H) % Ram::TILE_H) * Ram::TILE_W
+                    + (((x) % Ram::TILE_W + Ram::TILE_W) % Ram::TILE_W),
+            )
         } else {
             255
         }
     }
-    pub fn textri(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, u1: f32, v1: f32, u2: f32, v2: f32, u3: f32, v3: f32, use_map: bool, trans_color: u8) {
-        let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32).min(self.clip_rect.0 + self.clip_rect.2 - 1);
+    pub fn textri(
+        &mut self,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        x3: f32,
+        y3: f32,
+        u1: f32,
+        v1: f32,
+        u2: f32,
+        v2: f32,
+        u3: f32,
+        v3: f32,
+        use_map: bool,
+        trans_color: u8,
+    ) {
+        let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32)
+            .min(self.clip_rect.0 + self.clip_rect.2 - 1);
         let x_min = (x1.floor().min(x2.floor()).min(x3.floor()) as i32).max(self.clip_rect.0);
-        let y_max = (y1.ceil().max(y2.ceil()).max(y3.ceil()) as i32).min(self.clip_rect.1 + self.clip_rect.3 - 1);
+        let y_max = (y1.ceil().max(y2.ceil()).max(y3.ceil()) as i32)
+            .min(self.clip_rect.1 + self.clip_rect.3 - 1);
         let y_min = (y1.floor().min(y2.floor()).min(y3.floor()) as i32).max(self.clip_rect.1);
         let mat_inv: [[f32; 3]; 3] = [
-            [y3 - y2, y1 - y3, y2 - y1], 
+            [y3 - y2, y1 - y3, y2 - y1],
             [x2 - x3, x3 - x1, x1 - x2],
-            [x3 * y2 - x2 * y3, x1 * y3 - x3 * y1, x2 * y1 - x1 * y2]
+            [x3 * y2 - x2 * y3, x1 * y3 - x3 * y1, x2 * y1 - x1 * y2],
         ];
         let dnm = x3 * y2 - x2 * y3 + x1 * y3 - x3 * y1 + x2 * y1 - x1 * y2;
         let a = (u1 * mat_inv[0][0] + u2 * mat_inv[0][1] + u3 * mat_inv[0][2]) / dnm;
@@ -602,7 +916,9 @@ impl CartContext {
                     let cross1 = Self::cross_mult(x1, y1, x2, y2, x, y);
                     let cross2 = Self::cross_mult(x2, y2, x3, y3, x, y);
                     let cross3 = Self::cross_mult(x3, y3, x1, y1, x, y);
-                    if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0) || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0) {
+                    if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0)
+                        || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0)
+                    {
                         let u = (a * x + b * y + c).round() as i32;
                         let v = (d * x + e * y + f).round() as i32;
                         let color = self.get_map_pix(u, v);
@@ -620,7 +936,9 @@ impl CartContext {
                     let cross1 = Self::cross_mult(x1, y1, x2, y2, x, y);
                     let cross2 = Self::cross_mult(x2, y2, x3, y3, x, y);
                     let cross3 = Self::cross_mult(x3, y3, x1, y1, x, y);
-                    if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0) || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0) {
+                    if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0)
+                        || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0)
+                    {
                         let u = (a * x + b * y + c).round() as i32;
                         let v = (d * x + e * y + f).round() as i32;
                         let color = self.get_tile_pix(u, v);
@@ -643,7 +961,13 @@ impl CartContext {
             let line_data = self.ch_font.1[offset + i];
             for j in 0..8 {
                 if ((line_data >> j) & 1) != 0 {
-                    self.rect(x + j as i32 * scale, y + i as i32 * scale, scale, scale, color);
+                    self.rect(
+                        x + j as i32 * scale,
+                        y + i as i32 * scale,
+                        scale,
+                        scale,
+                        color,
+                    );
                 }
             }
         }
@@ -657,9 +981,17 @@ impl CartContext {
                 if ((line_data >> j) & 1) != 0 {
                     for k in 0..scale {
                         for l in 0..scale {
-                            let pix = Self::subpix_2_pix(x * 2 + j as i32 * scale + k, y * 2 + i as i32 * scale + l);
+                            let pix = Self::subpix_2_pix(
+                                x * 2 + j as i32 * scale + k,
+                                y * 2 + i as i32 * scale + l,
+                            );
                             if self.in_clip(pix.0, pix.1) {
-                                self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                                self.get_subpix_map_mut().set(
+                                    pix.0 as usize,
+                                    pix.1 as usize,
+                                    pix.2,
+                                    color,
+                                );
                             }
                         }
                     }
@@ -670,9 +1002,17 @@ impl CartContext {
                 if ((line_data >> j) & 1) != 0 {
                     for k in 0..scale {
                         for l in 0..scale {
-                            let pix = Self::subpix_2_pix(x * 2 + (j + 8) as i32 * scale + k, y * 2 + i as i32 * scale + l);
+                            let pix = Self::subpix_2_pix(
+                                x * 2 + (j + 8) as i32 * scale + k,
+                                y * 2 + i as i32 * scale + l,
+                            );
                             if self.in_clip(pix.0, pix.1) {
-                                self.get_subpix_map_mut().set(pix.0 as usize, pix.1 as usize, pix.2, color);
+                                self.get_subpix_map_mut().set(
+                                    pix.0 as usize,
+                                    pix.1 as usize,
+                                    pix.2,
+                                    color,
+                                );
                             }
                         }
                     }
@@ -681,11 +1021,28 @@ impl CartContext {
         }
         scale * 8 + 1
     }
-    pub fn print_ch(&mut self, text: &str, x: i32, y: i32, color: u8, is_fixed: bool, scale: i32, alt_font: bool) -> i32 {
+    pub fn print_ch(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        color: u8,
+        is_fixed: bool,
+        scale: i32,
+        alt_font: bool,
+    ) -> i32 {
         let mut text_width = 0;
         let mut x_offset = 0;
         let mut y = y;
-        let chr_height_en: i32 = scale * self.peek((if alt_font { Ram::ALT_FONT_OFFSET } else { Ram::SYSTEM_FONT_OFFSET }) + Ram::FONT_PARAM_OFFSET_RELATIVE + 1) as i32;
+        let chr_height_en: i32 = scale
+            * self.peek(
+                (if alt_font {
+                    Ram::ALT_FONT_OFFSET
+                } else {
+                    Ram::SYSTEM_FONT_OFFSET
+                }) + Ram::FONT_PARAM_OFFSET_RELATIVE
+                    + 1,
+            ) as i32;
         let chr_height: i32 = scale * 8;
         for chr in text.chars() {
             let chr = chr as u32;
@@ -696,19 +1053,38 @@ impl CartContext {
             } else {
                 if chr >= '一' as u32 && chr <= '龥' as u32 {
                     if alt_font {
-                        x_offset += self.putchar_ch_7px(char::from_u32(chr).unwrap_or('㗊'), x + x_offset, y, color, scale);
+                        x_offset += self.putchar_ch_7px(
+                            char::from_u32(chr).unwrap_or('㗊'),
+                            x + x_offset,
+                            y,
+                            color,
+                            scale,
+                        );
                     } else {
-                        x_offset += self.putchar_ch_16px(char::from_u32(chr).unwrap_or('㗊'), x + x_offset, y, color, scale);
+                        x_offset += self.putchar_ch_16px(
+                            char::from_u32(chr).unwrap_or('㗊'),
+                            x + x_offset,
+                            y,
+                            color,
+                            scale,
+                        );
                     }
                 } else {
                     let y = y - (chr_height_en - chr_height);
-                    x_offset += self.putchar(chr.clamp(0, 128) as u8, x + x_offset, y, color, is_fixed, scale, alt_font);
+                    x_offset += self.putchar(
+                        chr.clamp(0, 128) as u8,
+                        x + x_offset,
+                        y,
+                        color,
+                        is_fixed,
+                        scale,
+                        alt_font,
+                    );
                 }
             }
         }
         text_width.max(x_offset)
     }
-
 
     // inputs
 
@@ -727,7 +1103,10 @@ impl CartContext {
         }
     }
     pub fn key(&self, key_code: Option<u8>) -> bool {
-        let key_buffer: Vec<u8> = (0..4).into_iter().map(|i| self.peek(Ram::KEYBOARD_OFFSET + i)).collect();
+        let key_buffer: Vec<u8> = (0..4)
+            .into_iter()
+            .map(|i| self.peek(Ram::KEYBOARD_OFFSET + i))
+            .collect();
         match key_code {
             Some(code) => key_buffer.contains(&code),
             None => (key_buffer[0] | key_buffer[1] | key_buffer[2] | key_buffer[3]) != 0,
@@ -750,14 +1129,23 @@ impl CartContext {
         let period = period.max(1) as u32;
         match self.key_timer.get(&key_code) {
             None => false,
-            Some(&time) => time == 0 || (time > hold && (time - hold) % period == 0)
+            Some(&time) => time == 0 || (time > hold && (time - hold) % period == 0),
         }
     }
     pub fn mouse(&self) -> (u8, u8, bool, bool, bool, i8, i8) {
         let x = self.peek(Ram::MOUSE_OFFSET) as u8;
         let y = self.peek(Ram::MOUSE_OFFSET + 1) as u8;
-        let res: u16 = self.peek(Ram::MOUSE_OFFSET + 2) as u16 | ((self.peek(Ram::MOUSE_OFFSET + 3) as u16) << 8);
-        (x, y, (res & 1) != 0, (res & 2) != 0, (res & 4) != 0, ((res >> 1) as i8) >> 2, ((res >> 7) as i8) >> 2)
+        let res: u16 = self.peek(Ram::MOUSE_OFFSET + 2) as u16
+            | ((self.peek(Ram::MOUSE_OFFSET + 3) as u16) << 8);
+        (
+            x,
+            y,
+            (res & 1) != 0,
+            (res & 2) != 0,
+            (res & 4) != 0,
+            ((res >> 1) as i8) >> 2,
+            ((res >> 7) as i8) >> 2,
+        )
     }
 
     fn load_from_cart(&mut self, mask: u8, bank: u8) {
@@ -825,33 +1213,49 @@ impl CartContext {
     }
     fn save_to_cart(&mut self, mask: u8, bank: u8) {
         if (mask & 1) != 0 {
-            let data = (0..Ram::TILES_BYTE_SIZE).map(|i| self.ram[Ram::TILES_OFFSET + i]).collect();
+            let data = (0..Ram::TILES_BYTE_SIZE)
+                .map(|i| self.ram[Ram::TILES_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Tiles, bank, data);
         }
         if (mask & 2) != 0 {
-            let data = (0..Ram::SPRITES_BYTE_SIZE).map(|i| self.ram[Ram::SPRITES_OFFSET + i]).collect();
+            let data = (0..Ram::SPRITES_BYTE_SIZE)
+                .map(|i| self.ram[Ram::SPRITES_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Sprites, bank, data);
         }
         if (mask & 4) != 0 {
-            let data = (0..Ram::MAP_BYTE_SIZE).map(|i| self.ram[Ram::MAP_OFFSET + i]).collect();
+            let data = (0..Ram::MAP_BYTE_SIZE)
+                .map(|i| self.ram[Ram::MAP_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Map, bank, data);
         }
         if (mask & 8) != 0 {
-            let data = (0..Ram::SFX_BYTE_SIZE).map(|i| self.ram[Ram::SFX_OFFSET + i]).collect();
+            let data = (0..Ram::SFX_BYTE_SIZE)
+                .map(|i| self.ram[Ram::SFX_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Sfx, bank, data);
         }
         if (mask & 16) != 0 {
-            let data = (0..Ram::MUSIC_TRACKS_BYTE_SIZE).map(|i| self.ram[Ram::MUSIC_TRACKS_OFFSET + i]).collect();
+            let data = (0..Ram::MUSIC_TRACKS_BYTE_SIZE)
+                .map(|i| self.ram[Ram::MUSIC_TRACKS_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Music, bank, data);
-            let data = (0..Ram::MUSIC_PATTERNS_BYTE_SIZE).map(|i| self.ram[Ram::MUSIC_PATTERNS_OFFSET + i]).collect();
+            let data = (0..Ram::MUSIC_PATTERNS_BYTE_SIZE)
+                .map(|i| self.ram[Ram::MUSIC_PATTERNS_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Patterns, bank, data);
         }
         if (mask & 32) != 0 {
-            let data = (0..Vram::PALETTE_BYTE_SIZE).map(|i| self.ram[Vram::PALETTE_OFFSET + i]).collect();
+            let data = (0..Vram::PALETTE_BYTE_SIZE)
+                .map(|i| self.ram[Vram::PALETTE_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Palette, bank, data);
         }
         if (mask & 64) != 0 {
-            let data = (0..Ram::SPRITE_FLAGS_BYTE_SIZE).map(|i| self.ram[Ram::SPRITE_FLAGS_OFFSET + i]).collect();
+            let data = (0..Ram::SPRITE_FLAGS_BYTE_SIZE)
+                .map(|i| self.ram[Ram::SPRITE_FLAGS_OFFSET + i])
+                .collect();
             self.file_data.set_chunk(ChunkType::Flags, bank, data);
         }
         if (mask & 128) != 0 {
@@ -872,7 +1276,7 @@ impl CartContext {
 #[cfg(test)]
 mod tests {
     use crate::cartridge::CartContext;
-    use crate::cartridge::ram::{Vram, Ram};
+    use crate::cartridge::ram::{Ram, Vram};
     #[test]
     fn test_ram() {
         let mut context = CartContext::new();
@@ -882,14 +1286,19 @@ mod tests {
         //context.poke(0x12345, 0xab);
         context.poke_with_bits(0x12345 * 2, 0xb, 4);
         context.poke_with_bits(0x12345 * 2 + 1, 0xa, 4);
-        assert_eq!(context.peek4(0x12345 * 2), context.peek_with_bits(0x12345*2, 4));
+        assert_eq!(
+            context.peek4(0x12345 * 2),
+            context.peek_with_bits(0x12345 * 2, 4)
+        );
         assert_eq!(context.peek4(0x12345 * 2), 0xb);
         assert_eq!(context.peek4(0x12345 * 2 + 1), 0xa);
         context.set_pmem(12, 0x01234567);
         assert_eq!(context.get_pmem(12), 0x01234567);
-        assert_eq!(context.peek(Ram::PERSISTENT_MEMORY_OFFSET + 12 * 4 + 1), 0x45);
+        assert_eq!(
+            context.peek(Ram::PERSISTENT_MEMORY_OFFSET + 12 * 4 + 1),
+            0x45
+        );
         context.set_pmem(12, 0xfedc9999u32 as i32);
         assert_eq!(context.get_pmem(12), 0xfedc9999u32 as i32);
-
     }
 }

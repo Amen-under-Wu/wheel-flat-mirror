@@ -15,7 +15,10 @@ impl SystemContext {
     const MAX_LINES: usize = crate::cartridge::ram::Vram::SCREEN_HEIGHT / 9;
     pub fn new() -> Self {
         Self {
-            lines: vec!["拓竹杯参赛作品 wheel flat 轮扁".to_string(), "输入 run 进入演示,按esc回到终端".to_string()],
+            lines: vec![
+                "拓竹杯参赛作品 wheel flat 轮扁".to_string(),
+                "输入 run 进入演示,按esc回到终端".to_string(),
+            ],
             input_buffer: String::new(),
             cursor_pos: 0,
             top_line: 0,
@@ -46,7 +49,8 @@ impl SystemContext {
         }
         result
     }
-    pub fn line_count(line: &str) -> usize { // used for input only
+    pub fn line_count(line: &str) -> usize {
+        // used for input only
         let mut count = 0;
         let mut w = 6; // start with 6 to account for the ">" prompt
         for c in line.chars() {
@@ -75,7 +79,11 @@ impl SystemContext {
     }
 
     pub fn scroll(&mut self, lines: i32) {
-        let max_top = if self.lines.len() + Self::line_count(&self.input_buffer) > Self::MAX_LINES { self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES } else { 0 };
+        let max_top = if self.lines.len() + Self::line_count(&self.input_buffer) > Self::MAX_LINES {
+            self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES
+        } else {
+            0
+        };
         if lines > 0 {
             self.top_line = (self.top_line + lines as usize).min(max_top);
         } else {
@@ -83,7 +91,11 @@ impl SystemContext {
         }
     }
     pub fn scroll_to_bottom(&mut self) {
-        let max_top = if self.lines.len() + Self::line_count(&self.input_buffer)> Self::MAX_LINES { self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES } else { 0 };
+        let max_top = if self.lines.len() + Self::line_count(&self.input_buffer) > Self::MAX_LINES {
+            self.lines.len() + Self::line_count(&self.input_buffer) - Self::MAX_LINES
+        } else {
+            0
+        };
         self.top_line = max_top;
     }
 }

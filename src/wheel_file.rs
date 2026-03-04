@@ -86,14 +86,16 @@ impl WheelFile {
     }
 
     pub fn get_chunk(&self, chunk_type: ChunkType, bank: u8) -> Option<&Chunk> {
-        self.chunks.iter().find(|chunk| {
-            chunk.chunk_type == chunk_type && chunk.bank == bank
-        })
+        self.chunks
+            .iter()
+            .find(|chunk| chunk.chunk_type == chunk_type && chunk.bank == bank)
     }
     pub fn set_chunk(&mut self, chunk_type: ChunkType, bank: u8, data: Vec<u8>) {
-        if let Some(chunk) = self.chunks.iter_mut().find(|chunk| {
-            chunk.chunk_type == chunk_type && chunk.bank == bank
-        }) {
+        if let Some(chunk) = self
+            .chunks
+            .iter_mut()
+            .find(|chunk| chunk.chunk_type == chunk_type && chunk.bank == bank)
+        {
             chunk.data = data;
         } else {
             self.chunks.push(Chunk {
@@ -117,7 +119,12 @@ mod tests {
     fn test_wheel_file() {
         let f = WheelFile::from_bytes(include_bytes!("fallspire.tic"));
         for chunk in &f.chunks {
-            println!("Chunk type: {:?}, bank: {}, data length: {}", chunk.chunk_type, chunk.bank, chunk.data.len());
+            println!(
+                "Chunk type: {:?}, bank: {}, data length: {}",
+                chunk.chunk_type,
+                chunk.bank,
+                chunk.data.len()
+            );
         }
     }
 }

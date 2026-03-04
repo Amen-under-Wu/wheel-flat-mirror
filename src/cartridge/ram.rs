@@ -17,12 +17,15 @@ impl Vram {
     pub const PALETTE_SIZE: usize = 16;
     pub const PALETTE_BYTE_SIZE: usize = Self::PALETTE_SIZE * 3;
     pub const PALETTE_MAP_OFFSET: usize = Self::PALETTE_OFFSET + Self::PALETTE_BYTE_SIZE;
-    const PALETTE_MAP_BYTE_SIZE: usize = Self::PALETTE_SIZE * Self::PALETTE_SIZE.ilog2() as usize / 8;
+    const PALETTE_MAP_BYTE_SIZE: usize =
+        Self::PALETTE_SIZE * Self::PALETTE_SIZE.ilog2() as usize / 8;
     pub const BORDER_COLOR_OFFSET: usize = Self::PALETTE_MAP_OFFSET + Self::PALETTE_MAP_BYTE_SIZE;
     const BORDER_COLOR_BYTE_SIZE: usize = 1;
-    pub const SCREEN_OFFSET_OFFSET: usize = Self::BORDER_COLOR_OFFSET + Self::BORDER_COLOR_BYTE_SIZE;
+    pub const SCREEN_OFFSET_OFFSET: usize =
+        Self::BORDER_COLOR_OFFSET + Self::BORDER_COLOR_BYTE_SIZE;
     const SCREEN_OFFSET_BYTE_SIZE: usize = 2;
-    pub const MOUSE_CURSOR_OFFSET: usize = Self::SCREEN_OFFSET_OFFSET + Self::SCREEN_OFFSET_BYTE_SIZE;
+    pub const MOUSE_CURSOR_OFFSET: usize =
+        Self::SCREEN_OFFSET_OFFSET + Self::SCREEN_OFFSET_BYTE_SIZE;
     const MOUSE_CURSOR_BYTE_SIZE: usize = 1;
     pub const BLIT_SEGMENT_OFFSET: usize = Self::MOUSE_CURSOR_OFFSET + Self::MOUSE_CURSOR_BYTE_SIZE;
 
@@ -62,7 +65,6 @@ impl std::ops::IndexMut<usize> for Vram {
     }
 }
 
-
 pub struct Ram {
     vram: Vram,
     ram: [u8; Self::SIZE - Vram::SIZE],
@@ -101,26 +103,32 @@ impl Ram {
     pub const SOUND_REGISTERS_OFFSET: usize = Self::SFX_STATE_OFFSET + Self::SFX_STATE_BYTE_SIZE;
     pub const SOUND_REGISTER_SIZE: usize = 18;
     const SOUND_REGISTERS_BYTE_SIZE: usize = Self::SOUND_REGISTER_SIZE * 4;
-    pub const WAVEFORMS_OFFSET: usize = Self::SOUND_REGISTERS_OFFSET + Self::SOUND_REGISTERS_BYTE_SIZE;
+    pub const WAVEFORMS_OFFSET: usize =
+        Self::SOUND_REGISTERS_OFFSET + Self::SOUND_REGISTERS_BYTE_SIZE;
     const WAVEFORMS_N: usize = 16;
     const WAVEFORM_SAMPLE_N: usize = 32;
     const WAVEFORM_BPS: usize = 4; // bits per sample
-    const WAVEFORMS_BYTE_SIZE: usize = Self::WAVEFORMS_N * Self::WAVEFORM_SAMPLE_N * Self::WAVEFORM_BPS / 8;
+    const WAVEFORMS_BYTE_SIZE: usize =
+        Self::WAVEFORMS_N * Self::WAVEFORM_SAMPLE_N * Self::WAVEFORM_BPS / 8;
     pub const SFX_OFFSET: usize = Self::WAVEFORMS_OFFSET + Self::WAVEFORMS_BYTE_SIZE;
     pub const SFX_BYTE_SIZE: usize = 4224;
     pub const MUSIC_PATTERNS_OFFSET: usize = Self::SFX_OFFSET + Self::SFX_BYTE_SIZE;
     pub const MUSIC_PATTERNS_BYTE_SIZE: usize = 11520;
-    pub const MUSIC_TRACKS_OFFSET: usize = Self::MUSIC_PATTERNS_OFFSET + Self::MUSIC_PATTERNS_BYTE_SIZE;
+    pub const MUSIC_TRACKS_OFFSET: usize =
+        Self::MUSIC_PATTERNS_OFFSET + Self::MUSIC_PATTERNS_BYTE_SIZE;
     pub const MUSIC_TRACKS_BYTE_SIZE: usize = 408;
     pub const SOUND_STATE_OFFSET: usize = Self::MUSIC_TRACKS_OFFSET + Self::MUSIC_TRACKS_BYTE_SIZE;
     const SOUND_STATE_BYTE_SIZE: usize = 4;
     pub const STEREO_VOLUME_OFFSET: usize = Self::SOUND_STATE_OFFSET + Self::SOUND_STATE_BYTE_SIZE;
     const STEREO_VOLUME_BYTE_SIZE: usize = 4;
-    pub const PERSISTENT_MEMORY_OFFSET: usize = Self::STEREO_VOLUME_OFFSET + Self::STEREO_VOLUME_BYTE_SIZE;
+    pub const PERSISTENT_MEMORY_OFFSET: usize =
+        Self::STEREO_VOLUME_OFFSET + Self::STEREO_VOLUME_BYTE_SIZE;
     pub const PERSISTENT_MEMORY_SIZE: usize = 256;
     const BYTE_PER_PMEM: usize = 4;
-    pub const PERSISTENT_MEMORY_BYTE_SIZE: usize = Self::PERSISTENT_MEMORY_SIZE * Self::BYTE_PER_PMEM;
-    pub const SPRITE_FLAGS_OFFSET: usize = Self::PERSISTENT_MEMORY_OFFSET + Self::PERSISTENT_MEMORY_BYTE_SIZE;
+    pub const PERSISTENT_MEMORY_BYTE_SIZE: usize =
+        Self::PERSISTENT_MEMORY_SIZE * Self::BYTE_PER_PMEM;
+    pub const SPRITE_FLAGS_OFFSET: usize =
+        Self::PERSISTENT_MEMORY_OFFSET + Self::PERSISTENT_MEMORY_BYTE_SIZE;
     pub const SPRITE_FLAGS_BYTE_SIZE: usize = Self::TILES_N + Self::SPRITES_N;
     pub const SYSTEM_FONT_OFFSET: usize = Self::SPRITE_FLAGS_OFFSET + Self::SPRITE_FLAGS_BYTE_SIZE;
     const SYSTEM_FONT_BYTE_SIZE: usize = 1024;

@@ -1,20 +1,19 @@
-mod io_device;
 mod cartridge;
 mod data;
+mod io_device;
+mod script;
 mod system;
 mod web_bindings;
-mod script;
-mod wrapper;
 mod wheel_file;
+mod wrapper;
 
-
-use web_sys::WebGl2RenderingContext as GL;
-use wasm_bindgen::prelude::*;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
+use wasm_bindgen::prelude::*;
+use web_sys::WebGl2RenderingContext as GL;
 
-use crate::script::js::JsScript;
 use crate::script::WheelScript;
+use crate::script::js::JsScript;
 
 struct WheelContext {
     screen: Box<dyn io_device::Display>,
@@ -34,25 +33,43 @@ impl WheelContext {
         let canvas = document
             .get_element_by_id("canvas")
             .expect("canvas element not found")
-            .dyn_into::<web_sys::HtmlCanvasElement>().unwrap();
-        canvas.set_width((240+16)*4);
-        canvas.set_height((136+8)*4);
-        let gl = canvas.get_context("webgl2").unwrap().unwrap().dyn_into::<GL>().unwrap();
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .unwrap();
+        canvas.set_width((240 + 16) * 4);
+        canvas.set_height((136 + 8) * 4);
+        let gl = canvas
+            .get_context("webgl2")
+            .unwrap()
+            .unwrap()
+            .dyn_into::<GL>()
+            .unwrap();
         let mut screen = web_bindings::Screen::new(gl);
         screen.adjust_size(canvas.width() as f32);
 
         let rect = canvas.get_bounding_client_rect();
 
         let ibuffer = web_bindings::InputDevice::new_refcell();
-        web_bindings::InputDevice::link(&ibuffer, &canvas.dyn_into::<web_sys::EventTarget>().unwrap());
-        ibuffer.borrow_mut().set_rect(rect.x() as i32, rect.y() as i32, rect.width() as i32, rect.height() as i32,
-            web_bindings::Screen::WIDTH as i32, web_bindings::Screen::HEIGHT as i32);
+        web_bindings::InputDevice::link(
+            &ibuffer,
+            &canvas.dyn_into::<web_sys::EventTarget>().unwrap(),
+        );
+        ibuffer.borrow_mut().set_rect(
+            rect.x() as i32,
+            rect.y() as i32,
+            rect.width() as i32,
+            rect.height() as i32,
+            web_bindings::Screen::WIDTH as i32,
+            web_bindings::Screen::HEIGHT as i32,
+        );
 
         Self {
             screen: Box::new(screen),
             speaker: Box::new(web_bindings::DummySpeaker::new()),
             file_io: Box::new(web_bindings::FileDevice::new()),
-            vbuffer: vec![0; (web_bindings::Screen::WIDTH * web_bindings::Screen::HEIGHT * 3) as usize],
+            vbuffer: vec![
+                0;
+                (web_bindings::Screen::WIDTH * web_bindings::Screen::HEIGHT * 3) as usize
+            ],
             abuffer: [io_device::WheelSoundRegister::new(); 4],
             ibuffer: Box::new(ibuffer),
             fbuffer: Vec::new(),
@@ -70,7 +87,10 @@ impl WheelContext {
         }
     }
     fn in_screen(x: i32, y: i32) -> bool {
-        x >= 0 && y >= 0 && (x as u32) < web_bindings::Screen::WIDTH && (y as u32) < web_bindings::Screen::HEIGHT
+        x >= 0
+            && y >= 0
+            && (x as u32) < web_bindings::Screen::WIDTH
+            && (y as u32) < web_bindings::Screen::HEIGHT
     }
 }
 
@@ -204,13 +224,13 @@ impl wrapper::InternalProgram for DemoProgram {
             let y0 = self.i32_data["y"];
             let color = self.i32_data["color"] as u8;
             match self.i32_data["shape"] {
-                0 => { context.rect(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
-                1 => { context.rectb(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
+                0 => { context.rect(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); },
+                1 => { context.rectb(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); },
                 2 => { context.circ(x0, y0, ((x - x0).abs() + 1).max((y - y0).abs() + 1), color); }
                 3 => { context.circb(x0, y0, ((x - x0).abs() + 1).max((y - y0).abs() + 1), color); }
-                4 => { context.elli(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
-                5 => { context.ellib(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); }, 
-                6 => { context.line(x0 as f32, y0 as f32, x as f32, y as f32, color); }, 
+                4 => { context.elli(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); },
+                5 => { context.ellib(x0, y0, (x - x0).abs() + 1, (y - y0).abs() + 1, color); },
+                6 => { context.line(x0 as f32, y0 as f32, x as f32, y as f32, color); },
                 7 => { context.tri(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, color); },
                 8 => { context.trib(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, color); },
                 9 => { context.textri(0.0, 16.0, 16.0, 0.0, x as f32, y as f32, 0.0, 0.0, 32.0, 0.0, 0.0, 32.0, false, 0); },
@@ -253,11 +273,10 @@ impl Wheel {
         let mut js_script = JsScript::new();
         let script_str = include_str!("demo.js");
         js_script.load(script_str).unwrap();
-        program.programs.insert("demo".to_string(), Rc::new(RefCell::new(js_script)));
-        Self {
-            context,
-            program,
-        }
+        program
+            .programs
+            .insert("demo".to_string(), Rc::new(RefCell::new(js_script)));
+        Self { context, program }
     }
     pub fn update(&mut self) {
         self.program.update(&mut self.context);
