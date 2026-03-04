@@ -2,7 +2,7 @@ use crate::wheel_file::WheelFile;
 use js_sys::Date;
 
 pub struct SystemContext {
-    pub lines: Vec<String>,
+    pub lines: Vec<(String, u8)>,
     pub input_buffer: String,
     pub cursor_pos: usize,
     pub top_line: usize,
@@ -16,8 +16,8 @@ impl SystemContext {
     pub fn new() -> Self {
         Self {
             lines: vec![
-                "拓竹杯参赛作品 wheel flat 轮扁".to_string(),
-                "输入 run 进入演示,按esc回到终端".to_string(),
+                ("拓竹杯参赛作品 wheel flat 轮扁".to_string(), 4),
+                ("输入 run 进入演示,按esc回到终端".to_string(), 5),
             ],
             input_buffer: String::new(),
             cursor_pos: 0,
@@ -65,9 +65,10 @@ impl SystemContext {
         }
         count
     }
-    pub fn trace(&mut self, message: &str, _color: u8) {
+    pub fn trace(&mut self, message: &str, color: u8) {
         let new_lines = Self::split_line(message);
-        self.lines.extend(new_lines);
+        self.lines
+            .extend(new_lines.into_iter().map(|line| (line.clone(), color)));
     }
 
     pub fn reset(&mut self) {}

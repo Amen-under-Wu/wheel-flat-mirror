@@ -60,12 +60,12 @@ http-server
     - [ ] music
   - [ ] 内存操作函数
     - [x] ...
-    - [ ] sync
+    - [x] sync
   - [x] 实用函数
   - [ ] 系统函数
     - [x] ...
     - [ ] reset
-    - [ ] trace (with color)
+    - [x] trace (with color)
 - [ ] 实现系统console
   - [x] 滚动功能
   - [ ] 选中功能

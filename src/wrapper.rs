@@ -84,10 +84,10 @@ impl WheelWrapper {
         self.cart.borrow_mut().cls(0);
         for i in self.system.borrow().top_line..self.system.borrow().lines.len() {
             self.cart.borrow_mut().print_ch(
-                &self.system.borrow().lines[i],
+                &self.system.borrow().lines[i].0,
                 0,
                 (i - self.system.borrow().top_line) as i32 * 9,
-                13,
+                self.system.borrow().lines[i].1,
                 true,
                 1,
                 false,
@@ -117,7 +117,10 @@ impl WheelWrapper {
             self.system.borrow_mut().input_buffer.push(c);
         }
         if self.cart.borrow().keyp_with_hold_period(50, 60, 5) {
-            self.system.borrow_mut().lines.extend(input_lines);
+            self.system
+                .borrow_mut()
+                .lines
+                .extend(input_lines.iter().map(|s| (s.clone(), 13)));
             let in_str = self.system.borrow().input_buffer.clone();
             match parse_command(in_str.as_str()) {
                 Command::None => {}
