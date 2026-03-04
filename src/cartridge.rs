@@ -521,6 +521,14 @@ impl CartContext {
             } // maybe too much boundary checks?
         }
     }
+    pub fn map_with_remap(&mut self, x: i32, y: i32, w: i32, h: i32, sx: i32, sy: i32, trans_color: u8, scale: i32, remap: Box<dyn FnMut(i32, i32, i32) -> (i32, i32, i32)>) {
+        for i in 0..h {
+            for j in 0..w {
+                let (id, flip, rotate) = remap(self.mget(sx + j, sy + i), sx + j, sy + i);
+                self.spr(id, x + j * Ram::TILE_W as i32 * scale, y + i * Ram::TILE_H as i32 * scale, trans_color, scale, flip, rotate, 1, 1);
+            }
+        }
+    }
 
     fn cross_mult(x1: f32, y1: f32, x2: f32, y2: f32, x0: f32, y0: f32) -> f32 {
         (x2 - x1) * (y0 - y1) - (y2 - y1) * (x0 - x1)
