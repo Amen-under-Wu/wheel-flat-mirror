@@ -3,17 +3,45 @@ use crate::{
         CartContext,
         ram::{Ram, Vram},
     },
+    script::js::JsScript,
     system::SystemContext,
+    wheel_file::{Savable, WheelFile},
 };
 use js_sys::Date;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+enum Command {
+    None,
+    Clear,
+    Run,
+    Save,
+    Upload(String),
+    Unknown,
+}
+
+fn parse_command(input: &str) -> Command {
+    if input.trim().is_empty() {
+        return Command::None;
+    }
+    let parts: Vec<&str> = input.trim().split_whitespace().collect();
+    match parts.get(0).map(|s| *s) {
+        Some("clear") => Command::Clear,
+        Some("run") => Command::Run,
+        Some("save") => Command::Save,
+        Some("upload") if parts.len() > 1 => Command::Upload(parts[1].to_string()),
+        _ => Command::Unknown,
+    }
+}
 
 pub struct WheelWrapper {
     cart: Rc<RefCell<CartContext>>,
     system: Rc<RefCell<SystemContext>>,
     pub programs: HashMap<String, Rc<RefCell<dyn InternalProgram>>>,
     program: Option<Rc<RefCell<dyn InternalProgram>>>,
-    file_buffer: Vec<u8>,
+    file_in_buffer: Option<Vec<u8>>,
+    upload_flag: bool,
+    file_out_buffer: Vec<u8>,
+    active_name: String,
 }
 
 impl WheelWrapper {
@@ -25,7 +53,10 @@ impl WheelWrapper {
             system: Rc::new(RefCell::new(SystemContext::new())),
             programs: HashMap::new(),
             program: None,
-            file_buffer: Vec::new(),
+            file_in_buffer: None,
+            upload_flag: false,
+            file_out_buffer: Vec::new(),
+            active_name: "demo".to_string(),
         }
     }
     fn self_update(&mut self) {
@@ -37,6 +68,18 @@ impl WheelWrapper {
                 self.system.borrow_mut().exit_flag = false;
             }
             return;
+        }
+        if let Some(buffer) = &self.file_in_buffer {
+            if buffer.len() >= 4 {
+                let file = WheelFile::from_bytes(buffer);
+                let prog = JsScript::load(file);
+                self.programs
+                    .insert(self.active_name.clone(), Rc::new(RefCell::new(prog)));
+                self.system
+                    .borrow_mut()
+                    .trace(&format!("文件 {} 上传成功", self.active_name), 13);
+                self.file_in_buffer = None;
+            }
         }
         self.cart.borrow_mut().cls(0);
         for i in self.system.borrow().top_line..self.system.borrow().lines.len() {
@@ -76,22 +119,29 @@ impl WheelWrapper {
         if self.cart.borrow().keyp_with_hold_period(50, 60, 5) {
             self.system.borrow_mut().lines.extend(input_lines);
             let in_str = self.system.borrow().input_buffer.clone();
-            match in_str.as_str() {
-                "" => {}
-                "clear" => self.system.borrow_mut().lines.clear(),
-                "cls" => self.system.borrow_mut().lines.clear(),
-                "run" => {
+            match parse_command(in_str.as_str()) {
+                Command::None => {}
+                Command::Clear => self.system.borrow_mut().lines.clear(),
+                Command::Run => {
                     self.system.borrow_mut().program_timer = Date::now() as u64;
-                    self.programs["demo"]
+                    self.programs[self.active_name.as_str()]
                         .borrow_mut()
                         .init(self.cart.clone(), self.system.clone());
-                    self.program = Some(self.programs["demo"].clone());
+                    self.program = Some(self.programs[self.active_name.as_str()].clone());
                 }
-                "save" => {
-                    self.file_buffer = self.programs["demo"].borrow().to_file().unwrap_or_default();
+                Command::Save => {
+                    self.file_out_buffer = self.programs[self.active_name.as_str()]
+                        .borrow()
+                        .to_file()
+                        .unwrap_or_default();
                 }
-                _ => {
-                    self.system.borrow_mut().lines.push("未知命令".to_string());
+                Command::Upload(name) => {
+                    self.active_name = name.clone();
+                    self.file_in_buffer = Some(Vec::new());
+                    self.upload_flag = true;
+                }
+                Command::Unknown => {
+                    self.system.borrow_mut().trace("未知命令", 13);
                 }
             }
             self.system.borrow_mut().input_buffer.clear();
@@ -262,6 +312,15 @@ impl crate::WheelProgram for WheelWrapper {
     fn init(&mut self, _wheel: &mut dyn crate::WheelInterface) {}
     fn update(&mut self, wheel: &mut dyn crate::WheelInterface) {
         // get input
+        if self.upload_flag {
+            wheel.upload_file();
+            self.upload_flag = false;
+        }
+        if let Some(buffer) = &self.file_in_buffer {
+            if buffer.is_empty() {
+                self.file_in_buffer = Some(wheel.read_file());
+            }
+        }
         let mut btns = wheel.get_buttons();
         let keys = wheel.get_keys();
 
@@ -437,9 +496,12 @@ impl crate::WheelProgram for WheelWrapper {
 
         // todo: play sound
 
-        if !self.file_buffer.is_empty() {
-            wheel.save_file("demo.wheel", self.file_buffer.clone());
-            self.file_buffer.clear();
+        if !self.file_out_buffer.is_empty() {
+            wheel.save_file(
+                &format!("{}.wf", self.active_name),
+                self.file_out_buffer.clone(),
+            );
+            self.file_out_buffer.clear();
         }
     }
 }

@@ -774,7 +774,7 @@ impl CartContext {
         sy: i32,
         trans_color: u8,
         scale: i32,
-        remap: Box<dyn FnMut(i32, i32, i32) -> (i32, i32, i32)>,
+        mut remap: Box<dyn FnMut(i32, i32, i32) -> (i32, i32, i32)>,
     ) {
         for i in 0..h {
             for j in 0..w {

@@ -58,12 +58,7 @@ async function loadFile() {
         // 将ArrayBuffer转换为Uint8Array并存储
         const arrayBuffer = e.target.result;
         window.fileData = new Uint8Array(arrayBuffer);
-        console.log('文件已加载，大小:', window.fileData.length, '字节');
-        
-        // 触发Rust处理（可选）
-        if (window.processFileInRust) {
-            window.processFileInRust();
-        }
+        //console.log('文件已加载，大小:', window.fileData.length, '字节');
     };
     reader.readAsArrayBuffer(file);
 }
