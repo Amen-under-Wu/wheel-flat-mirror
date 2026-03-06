@@ -33,15 +33,22 @@ fn parse_command(input: &str) -> Command {
     }
 }
 
+enum WrapperState {
+    Idle,
+    Running(Box<dyn InternalProgram>),
+    Editing,
+    Menu,
+}
+
 pub struct WheelWrapper {
+    state: WrapperState,
     cart: Rc<RefCell<CartContext>>,
     system: Rc<RefCell<SystemContext>>,
-    pub programs: HashMap<String, Rc<RefCell<dyn InternalProgram>>>,
-    program: Option<Rc<RefCell<dyn InternalProgram>>>,
     file_in_buffer: Option<Vec<u8>>,
     upload_flag: bool,
     file_out_buffer: Vec<u8>,
     active_name: String,
+    file: WheelFile,
 }
 
 impl WheelWrapper {
@@ -49,22 +56,27 @@ impl WheelWrapper {
     const BORDER_H: usize = 4;
     pub fn new() -> Self {
         Self {
+            state: WrapperState::Idle,
             cart: Rc::new(RefCell::new(CartContext::new())),
             system: Rc::new(RefCell::new(SystemContext::new())),
-            programs: HashMap::new(),
-            program: None,
             file_in_buffer: None,
             upload_flag: false,
             file_out_buffer: Vec::new(),
             active_name: "demo".to_string(),
+            file: WheelFile::new_demo(),
         }
     }
     fn self_update(&mut self) {
-        if let Some(program) = &self.program {
-            program.borrow_mut().update();
+        if let WrapperState::Running(program) = &mut self.state {
+            program.update();
             let exit_flag = self.system.borrow().exit_flag;
             if exit_flag {
-                self.program = None;
+                if let Some(bytes) = program.to_file() {
+                    if let Ok(file) = WheelFile::from_bytes(&bytes) {
+                        self.file = file;
+                    }
+                }
+                self.state = WrapperState::Idle;
                 self.system.borrow_mut().exit_flag = false;
             }
             return;
@@ -73,9 +85,7 @@ impl WheelWrapper {
             if buffer.len() >= 4 {
                 match WheelFile::from_bytes(buffer) {
                     Ok(file) => {
-                        let prog = JsScript::load(file);
-                        self.programs
-                            .insert(self.active_name.clone(), Rc::new(RefCell::new(prog)));
+                        self.file = file;
                         self.system
                             .borrow_mut()
                             .trace(&format!("文件 {} 上传成功", self.active_name), 13);
@@ -135,16 +145,12 @@ impl WheelWrapper {
                 Command::Clear => self.system.borrow_mut().lines.clear(),
                 Command::Run => {
                     self.system.borrow_mut().program_timer = Date::now() as u64;
-                    self.programs[self.active_name.as_str()]
-                        .borrow_mut()
-                        .init(self.cart.clone(), self.system.clone());
-                    self.program = Some(self.programs[self.active_name.as_str()].clone());
+                    let mut script = JsScript::load(self.file.clone());
+                    script.init(self.cart.clone(), self.system.clone());
+                    self.state = WrapperState::Running(Box::new(script));
                 }
                 Command::Save => {
-                    self.file_out_buffer = self.programs[self.active_name.as_str()]
-                        .borrow()
-                        .to_file()
-                        .unwrap_or_default();
+                    self.file_out_buffer = self.file.to_bytes();
                 }
                 Command::Upload(name) => {
                     self.active_name = name.clone();
@@ -420,8 +426,8 @@ impl crate::WheelProgram for WheelWrapper {
         self.cart.borrow_mut().ram.set_active_vbank(0);
         self.self_update();
         for i in 0..Self::BORDER_H {
-            if let Some(prog) = &self.program {
-                prog.borrow_mut().scanline(i);
+            if let WrapperState::Running(prog) = &mut self.state {
+                prog.scanline(i);
             }
             let color = self.get_color(self.cart.borrow().peek(Vram::BORDER_COLOR_OFFSET));
             for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
@@ -429,8 +435,8 @@ impl crate::WheelProgram for WheelWrapper {
             }
         }
         for i in 0..Vram::SCREEN_HEIGHT {
-            if let Some(prog) = &self.program {
-                prog.borrow_mut().scanline(i + Self::BORDER_H);
+            if let WrapperState::Running(prog) = &mut self.state {
+                prog.scanline(i + Self::BORDER_H);
             }
             let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
             let x_offset: i32 = (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
@@ -463,8 +469,8 @@ impl crate::WheelProgram for WheelWrapper {
         }
         for i in 0..Self::BORDER_H {
             let ii = i + Self::BORDER_H + Vram::SCREEN_HEIGHT;
-            if let Some(prog) = &self.program {
-                prog.borrow_mut().scanline(ii);
+            if let WrapperState::Running(prog) = &mut self.state {
+                prog.scanline(ii);
             }
             let color = self.get_color(self.cart.borrow().peek(Vram::BORDER_COLOR_OFFSET));
             for x in 0..(Self::BORDER_W * 2 + Vram::SCREEN_WIDTH) as i32 {
@@ -473,8 +479,8 @@ impl crate::WheelProgram for WheelWrapper {
         }
 
         self.cart.borrow_mut().ram.set_active_vbank(1);
-        if let Some(prog) = &self.program {
-            prog.borrow_mut().overlay();
+        if let WrapperState::Running(prog) = &mut self.state {
+            prog.overlay();
         }
         let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
         let trans_color = self.cart.borrow().peek(Vram::BORDER_COLOR_OFFSET) & 0xf;

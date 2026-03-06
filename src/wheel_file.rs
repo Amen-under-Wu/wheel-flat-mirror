@@ -32,6 +32,9 @@ impl WheelFile {
     pub fn new() -> Self {
         WheelFile { chunks: Vec::new() }
     }
+    pub fn new_demo() -> Self {
+        Self::from_bytes(include_bytes!("../data/demo.wf")).unwrap()
+    }
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
         let mut chunks = Vec::new();
         let mut offset = 0;

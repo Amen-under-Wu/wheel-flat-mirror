@@ -55,11 +55,10 @@ impl Savable for JsScript {
                 script_data.chunks.push(chunk);
             }
         }
-        Self {
-            data: script_data,
-            script,
-            system: None,
-        }
+        let mut result = Self::new();
+        result.data = script_data;
+        result.script = script;
+        result
     }
 }
 
@@ -563,6 +562,14 @@ impl WheelScript for JsScript {
         Ok(())
     }
     fn init(&mut self) -> Result<(), String> {
+        let global = js_sys::global();
+        let eval = Reflect::get(&global, &JsValue::from_str("eval"))
+            .map_err(|e| format!("Error accessing eval: {:?}", e))?
+            .dyn_into::<Function>()
+            .map_err(|e| format!("Error converting eval to Function: {:?}", e))?;
+        eval.call1(&JsValue::NULL, &JsValue::from_str(&self.script))
+            .map_err(|e| format!("Error executing script: {:?}", e))?;
+
         js_sys::eval("if (typeof init !== 'undefined') { init(); }")
             .map_err(|e| format!("Error calling init: {:?}", e))?;
         Ok(())
