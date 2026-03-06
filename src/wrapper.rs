@@ -71,13 +71,21 @@ impl WheelWrapper {
         }
         if let Some(buffer) = &self.file_in_buffer {
             if buffer.len() >= 4 {
-                let file = WheelFile::from_bytes(buffer);
-                let prog = JsScript::load(file);
-                self.programs
-                    .insert(self.active_name.clone(), Rc::new(RefCell::new(prog)));
-                self.system
-                    .borrow_mut()
-                    .trace(&format!("文件 {} 上传成功", self.active_name), 13);
+                match WheelFile::from_bytes(buffer) {
+                    Ok(file) => {
+                        let prog = JsScript::load(file);
+                        self.programs
+                            .insert(self.active_name.clone(), Rc::new(RefCell::new(prog)));
+                        self.system
+                            .borrow_mut()
+                            .trace(&format!("文件 {} 上传成功", self.active_name), 13);
+                    },
+                    Err(e) => {
+                        self.system
+                            .borrow_mut()
+                            .trace(&format!("文件解析失败: {}", e), 13);
+                    }
+                }
                 self.file_in_buffer = None;
             }
         }
@@ -497,7 +505,19 @@ impl crate::WheelProgram for WheelWrapper {
             }
         }
 
-        // todo: play sound
+        // play sound
+
+        for i in 0..4 {
+            let offset = i * Ram::SOUND_REGISTER_SIZE + Ram::SOUND_REGISTERS_OFFSET;
+            let freq_vol = u16::from_le_bytes([self.cart.borrow().peek(offset), self.cart.borrow().peek(offset + 1)]);
+            let freq = freq_vol & ((1 << 12) - 1);
+            let vol = (freq_vol >> 12) as u8;
+            let mut waveform = [0; 32];
+            for j in 0..32 {
+                waveform[j] = self.cart.borrow().peek4((offset + 2) * 2 + j);
+            }
+            wheel.play(i, waveform, vol, freq);
+        }
 
         if !self.file_out_buffer.is_empty() {
             wheel.save_file(

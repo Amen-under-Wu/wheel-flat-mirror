@@ -32,7 +32,7 @@ impl WheelFile {
     pub fn new() -> Self {
         WheelFile { chunks: Vec::new() }
     }
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
         let mut chunks = Vec::new();
         let mut offset = 0;
 
@@ -51,13 +51,22 @@ impl WheelFile {
                 17 => ChunkType::Default,
                 18 => ChunkType::Screen,
                 19 => ChunkType::Binary,
-                _ => panic!("Unknown chunk type: {}", bytes[offset]),
+                _ => return Err(format!(
+                    "Unknown chunk type: {} at offset {}",
+                    bytes[offset] & 31,
+                    offset
+                )),
             };
 
             let bank = bytes[offset] >> 5;
             let length = u16::from_le_bytes([bytes[offset + 1], bytes[offset + 2]]) as usize;
+            if offset + 4 + length > bytes.len() {
+                return Err(format!(
+                    "Chunk data exceeds file length at offset {}",
+                    offset
+                ));
+            }
             let data = bytes[offset + 4..offset + 4 + length].to_vec();
-
             chunks.push(Chunk {
                 chunk_type,
                 bank,
@@ -67,7 +76,7 @@ impl WheelFile {
             offset += 4 + length;
         }
 
-        WheelFile { chunks }
+        Ok(WheelFile { chunks })
     }
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
