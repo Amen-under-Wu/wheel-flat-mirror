@@ -32,7 +32,7 @@ jobs:
 
       # 2. 安装 Rust
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
