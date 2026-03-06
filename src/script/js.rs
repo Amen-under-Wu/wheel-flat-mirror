@@ -458,7 +458,17 @@ impl WheelScript for JsScript {
         closure.forget();
         Reflect::set(&global, &"spr_vec_9".into(), &func).unwrap();
 
-        // todo: sync
+        let cart_clone = cart.clone();
+        let closure = Closure::wrap(Box::new(move |m: i32, b: i32, t| {
+            if b >= 0 && b < 8 {
+                cart_clone
+                    .borrow_mut()
+                    .sync(m.try_into().unwrap_or(255), b as u8, t);
+            }
+        }) as Box<dyn FnMut(i32, i32, bool)>);
+        let func = closure.as_ref().unchecked_ref::<Function>().clone();
+        closure.forget();
+        Reflect::set(&global, &"sync_3".into(), &func).unwrap();
 
         let cart_clone = cart.clone();
         let closure = Closure::wrap(Box::new(move |vec: Vec<f32>, m, c: i32| {

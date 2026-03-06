@@ -112,6 +112,10 @@ function spr(id, x, y, trans_color = -1, scale = 1, flip = 0, rotate = 0, w = 1,
     spr_vec_9([id, x, y, trans_color, scale, flip, rotate, w, h]);
 }
 
+function sync(mask = 0, bank = 0, to_cart = false) {
+    sync_3(mask, bank, to_cart);
+}
+
 function textri(x1, y1, x2, y2, x3, y3, u1, v1, u2, v2, u3, v3, use_map = false, trans_color = -1) {
     textri_3([x1, y1, x2, y2, x3, y3, u1, v1, u2, v2, u3, v3], use_map, trans_color);
 }
