@@ -1,0 +1,62 @@
+# 本 GitHub Actions 工作流文件由大语言模型生成
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["main"] # 或者 "master"，取决于你的默认分支名
+  workflow_dispatch: # 允许手动触发部署
+
+# 设置权限，允许写入 GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 允许只有一个并发部署任务
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      # 1. 检出代码
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. 安装 Rust
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      # 3. 安装 wasm-pack
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
+
+      # 4. 构建 WASM (生成 pkg 目录)
+      - name: Build with wasm-pack
+        run: wasm-pack build --target web --release
+
+      # 5. 部署到 GitHub Pages
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 上传整个根目录，因为 index.html 在根目录，pkg 也在根目录
+          path: '.' 
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
