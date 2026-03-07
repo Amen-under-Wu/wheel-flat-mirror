@@ -35,6 +35,22 @@ impl WheelFile {
     pub fn new_demo() -> Self {
         Self::from_bytes(include_bytes!("../data/demo.wf")).unwrap()
     }
+    pub fn new_default() -> Self {
+        Self {
+            chunks: vec![
+                Chunk {
+                    chunk_type: ChunkType::Tiles,
+                    bank: 0,
+                    data: crate::data::tic80_mascot_spr(),
+                },
+                Chunk {
+                    chunk_type: ChunkType::Palette,
+                    bank: 0,
+                    data: crate::data::tic80_palette().to_vec(),
+                }
+            ]
+        }
+    }
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
         let mut chunks = Vec::new();
         let mut offset = 0;

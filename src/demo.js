@@ -6,6 +6,7 @@ let sy = 24;
 let shape = 0;
 let color = 1;
 function init() {
+    sync(0, 0, true);
     poke(0x4000, 0x22);
     poke(0x8000, 1);
     trace("运行demo", 13);

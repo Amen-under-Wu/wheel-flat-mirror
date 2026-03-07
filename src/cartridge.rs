@@ -7,7 +7,7 @@ use crate::{
     },
     wheel_file::{ChunkType, WheelFile},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc, cell::RefCell};
 
 pub struct CartContext {
     pub ram: Ram,
@@ -15,7 +15,7 @@ pub struct CartContext {
     pub key_timer: HashMap<u8, u32>,
     pub btn_timer: [i32; 32],
     ch_font: (Vec<u8>, Vec<u8>),
-    pub file_data: WheelFile,
+    pub file_data: Rc<RefCell<WheelFile>>,
 }
 
 impl CartContext {
@@ -27,7 +27,7 @@ impl CartContext {
             key_timer: HashMap::new(),
             btn_timer: [0; 32],
             ch_font: crate::data::ch_font(),
-            file_data: WheelFile::new(),
+            file_data: Rc::new(RefCell::new(WheelFile::new())),
         }
     }
 
@@ -1150,61 +1150,61 @@ impl CartContext {
 
     fn load_from_cart(&mut self, mask: u8, bank: u8) {
         if (mask & 1) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Tiles, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Tiles, bank) {
                 for i in 0..data.data.len().min(Ram::TILES_BYTE_SIZE) {
                     self.ram[Ram::TILES_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 2) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Sprites, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Sprites, bank) {
                 for i in 0..data.data.len().min(Ram::SPRITES_BYTE_SIZE) {
                     self.ram[Ram::SPRITES_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 4) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Map, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Map, bank) {
                 for i in 0..data.data.len().min(Ram::MAP_BYTE_SIZE) {
                     self.ram[Ram::MAP_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 8) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Sfx, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Sfx, bank) {
                 for i in 0..data.data.len().min(Ram::SFX_BYTE_SIZE) {
                     self.ram[Ram::SFX_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 16) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Music, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Music, bank) {
                 for i in 0..data.data.len().min(Ram::MUSIC_TRACKS_BYTE_SIZE) {
                     self.ram[Ram::MUSIC_TRACKS_OFFSET + i] = data.data[i];
                 }
             }
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Patterns, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Patterns, bank) {
                 for i in 0..data.data.len().min(Ram::MUSIC_PATTERNS_BYTE_SIZE) {
                     self.ram[Ram::MUSIC_PATTERNS_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 32) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Palette, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Palette, bank) {
                 for i in 0..data.data.len().min(Vram::PALETTE_BYTE_SIZE) {
                     self.ram[Vram::PALETTE_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 64) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Flags, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Flags, bank) {
                 for i in 0..data.data.len().min(Ram::SPRITE_FLAGS_BYTE_SIZE) {
                     self.ram[Ram::SPRITE_FLAGS_OFFSET + i] = data.data[i];
                 }
             }
         }
         if (mask & 128) != 0 {
-            if let Some(data) = self.file_data.get_chunk(ChunkType::Screen, bank) {
+            if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Screen, bank) {
                 for i in 0..data.data.len().min(Vram::SCREEN_BYTE_SIZE) {
                     self.ram[i] = data.data[i];
                 }
@@ -1216,51 +1216,51 @@ impl CartContext {
             let data = (0..Ram::TILES_BYTE_SIZE)
                 .map(|i| self.ram[Ram::TILES_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Tiles, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Tiles, bank, data);
         }
         if (mask & 2) != 0 {
             let data = (0..Ram::SPRITES_BYTE_SIZE)
                 .map(|i| self.ram[Ram::SPRITES_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Sprites, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Sprites, bank, data);
         }
         if (mask & 4) != 0 {
             let data = (0..Ram::MAP_BYTE_SIZE)
                 .map(|i| self.ram[Ram::MAP_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Map, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Map, bank, data);
         }
         if (mask & 8) != 0 {
             let data = (0..Ram::SFX_BYTE_SIZE)
                 .map(|i| self.ram[Ram::SFX_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Sfx, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Sfx, bank, data);
         }
         if (mask & 16) != 0 {
             let data = (0..Ram::MUSIC_TRACKS_BYTE_SIZE)
                 .map(|i| self.ram[Ram::MUSIC_TRACKS_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Music, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Music, bank, data);
             let data = (0..Ram::MUSIC_PATTERNS_BYTE_SIZE)
                 .map(|i| self.ram[Ram::MUSIC_PATTERNS_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Patterns, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Patterns, bank, data);
         }
         if (mask & 32) != 0 {
             let data = (0..Vram::PALETTE_BYTE_SIZE)
                 .map(|i| self.ram[Vram::PALETTE_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Palette, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Palette, bank, data);
         }
         if (mask & 64) != 0 {
             let data = (0..Ram::SPRITE_FLAGS_BYTE_SIZE)
                 .map(|i| self.ram[Ram::SPRITE_FLAGS_OFFSET + i])
                 .collect();
-            self.file_data.set_chunk(ChunkType::Flags, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Flags, bank, data);
         }
         if (mask & 128) != 0 {
             let data = (0..Vram::SCREEN_BYTE_SIZE).map(|i| self.ram[i]).collect();
-            self.file_data.set_chunk(ChunkType::Screen, bank, data);
+            self.file_data.borrow_mut().set_chunk(ChunkType::Screen, bank, data);
         }
     }
     pub fn sync(&mut self, mask: u8, bank: u8, to_cart: bool) {
@@ -1270,6 +1270,9 @@ impl CartContext {
         } else {
             self.load_from_cart(mask, bank);
         }
+    }
+    pub fn set_file_ptr(&mut self, file_ptr: Rc<RefCell<WheelFile>>) {
+        self.file_data = file_ptr;
     }
 }
 

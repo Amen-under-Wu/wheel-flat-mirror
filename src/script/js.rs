@@ -9,9 +9,10 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 
 pub struct JsScript {
-    data: WheelFile,
+    data: Rc<RefCell<WheelFile>>,
     script: String,
     system: Option<Rc<RefCell<SystemContext>>>,
+    cart: Option<Rc<RefCell<CartContext>>>,
 }
 
 impl JsScript {
@@ -27,16 +28,17 @@ impl JsScript {
         )
         .unwrap();
         Self {
-            data: WheelFile { chunks: Vec::new() },
+            data: Rc::new(RefCell::new(WheelFile::new())),
             script: String::new(),
             system: None,
+            cart: None,
         }
     }
 }
 
 impl Savable for JsScript {
     fn save(&self) -> WheelFile {
-        let mut file = self.data.clone();
+        let mut file = self.data.borrow().clone();
         file.chunks.push(Chunk {
             chunk_type: ChunkType::Code,
             bank: 0,
@@ -56,7 +58,7 @@ impl Savable for JsScript {
             }
         }
         let mut result = Self::new();
-        result.data = script_data;
+        result.data = Rc::new(RefCell::new(script_data));
         result.script = script;
         result
     }
@@ -65,6 +67,9 @@ impl Savable for JsScript {
 impl WheelScript for JsScript {
     fn bind(&mut self, cart: Rc<RefCell<CartContext>>, system: Rc<RefCell<SystemContext>>) {
         self.system = Some(system.clone());
+        self.cart = Some(cart.clone());
+        cart.borrow_mut().set_file_ptr(self.data.clone());
+        cart.borrow_mut().sync(255, 0, false);
 
         let global = js_sys::global();
 

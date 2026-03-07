@@ -74,9 +74,13 @@ impl WheelWrapper {
                 if let Some(bytes) = program.to_file() {
                     if let Ok(file) = WheelFile::from_bytes(&bytes) {
                         self.file = file;
+                    } else {
+                        web_sys::console::log_1(&"failed to load file from runtime".into());
                     }
                 }
                 self.state = WrapperState::Idle;
+                self.cart.borrow_mut().set_file_ptr(Rc::new(RefCell::new(WheelFile::new_default())));
+                self.cart.borrow_mut().sync(255, 0, false);
                 self.system.borrow_mut().exit_flag = false;
             }
             return;
@@ -144,6 +148,7 @@ impl WheelWrapper {
                 Command::None => {}
                 Command::Clear => self.system.borrow_mut().lines.clear(),
                 Command::Run => {
+                    //self.cart.borrow_mut().sync(255, 0, false);
                     self.system.borrow_mut().program_timer = Date::now() as u64;
                     let mut script = JsScript::load(self.file.clone());
                     script.init(self.cart.clone(), self.system.clone());

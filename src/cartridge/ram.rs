@@ -151,10 +151,6 @@ impl Ram {
         for i in 0..8 {
             ram[Self::GAMEPAD_MAPPING_OFFSET - Vram::SIZE + i] = key_map[i];
         }
-        let mascot = crate::data::tic80_mascot_spr();
-        for i in 0..mascot.len() {
-            ram[Self::TILES_OFFSET - Vram::SIZE + i] = mascot[i];
-        }
         Self {
             vram: Vram::new(),
             ram,
