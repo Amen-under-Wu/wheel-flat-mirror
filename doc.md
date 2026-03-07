@@ -18,7 +18,14 @@
 - **上层**：JsScript实现`trait InternalProgram`，整合Wrapper中的接口到js环境，供内部存储的js脚本调用。
 
 ## 使用说明
-目前内置编辑器尚未实现，因此用户只能通过上传外部编辑器生成的二进制文件运行自制程序。二进制文件的编码格式大部分与`.tic`文件格式相同。由于web平台对许多rust库支持有限，WheelFlat目前仅支持使用javascript编写脚本。
+目前内置编辑器尚未实现，因此用户只能通过上传外部编辑器生成的二进制文件运行自制程序。二进制文件的编码格式除代码文本部分不支持压缩/解压缩之外，其余大部分与`.tic`文件格式相同，详见[TIC-80官方文档](https://github.com/nesbox/TIC-80/wiki/.tic-File-Format)。由于web平台对许多rust库支持有限，WheelFlat目前仅支持使用javascript编写脚本。一个取巧的测试方式为利用TIC-80编辑js卡带，保存为`.tic`格式后修改后缀名为`.wf`，之后上传到本网站运行。编辑时应注意回调函数名的区别。
+
+### 可用命令
+当前的命令行界面仍十分简陋，并**不**支持选中、粘贴、记忆命令、自动补全、光标移动等功能。当前可用的命令为：
+- `clear`：清空终端显示的文字
+- `upload <filename>`：上传文件并加载，文件在内部将被命名为`<filename>`。
+- `run`：运行当前加载的文件。
+- `save`：保存当前加载的文件到本地。
 
 ### 接口
 
@@ -89,3 +96,107 @@
 - `time()`：获取程序启动以来的毫秒数。
 - `tstamp()`：获取当前的秒级UNIX时间戳。
 - `trace(text, color=15)`：向命令行的“标准输出”写入字符串`text`，以颜色`color`显示。
+
+#### 示例代码
+```javascript
+let t = 0;
+let x = 0;
+let y = 0;
+let sx = 96;
+let sy = 24;
+let shape = 0;
+let color = 1;
+function init() {
+    poke(0x4000, 0x22); // 设置id为0的sprite左上角的两个像素为红色
+    poke(0x8000, 1); // 设置地图左上角的地图块为id为1的tile（即tic-80吉祥物的左上部分）
+    trace("运行demo", 13); // 输出信息到命令行
+}
+
+function update() {
+    cls(13); // 刷新屏幕
+    map(1, 1, 10, 10, 0, 0, 255, 1); // 绘制地图
+
+    // 绘制文字
+    print_ch("你好wheel flat轮扁!", 84, 84, 0, false, 1, false);
+    print_ch("你好wheel flat轮扁!", 84, 94, 0, false, 1, true);
+    print_ch("按esc回到终端", 84, 104, 0, false, 1, false);
+
+    // 控制吉祥物移动
+    if (btn(0)) {
+        sy = sy - 1;
+    }
+    if (btn(1)) {
+        sy = sy + 1;
+    }
+    if (btn(2)) {
+        sx = sx - 1;
+    }
+    if (btn(3)) {
+        sx = sx + 1;
+    }
+
+    // 绘制吉祥物
+    spr(1 + Math.floor(t % 60 / 30) * 2, sx, sy, 14, 3, 0, 0, 2, 2);
+
+    // 控制鼠标绘图
+    let [xx, yy, left,] = mouse();
+    if (left) {
+        if (x === -1) {
+            x = xx;
+            y = yy;
+        }
+        if (shape === 0) {
+            // 绘制实心长方形
+            rect(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 1) {
+            // 绘制空心长方形
+            rectb(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 2) {
+            // 绘制实心圆形
+            circ(x, y, Math.sqrt((xx - x) ** 2 + (yy - y) ** 2), color);
+        } else if (shape === 3) {
+            // 绘制空心圆形
+            circb(x, y, Math.sqrt((xx - x) ** 2 + (yy - y) ** 2), color);
+        } else if (shape === 4) {
+            // 绘制实心椭圆形
+            elli(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 5) {
+            // 绘制空心椭圆形
+            ellib(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 6) {
+            // 绘制直线
+            line(x, y, xx, yy, color);
+        } else if (shape === 7) {
+            // 绘制实心三角形
+            tri(0, 16, 16, 0, xx, yy, color);
+        } else if (shape === 8) {
+            // 绘制空心三角形
+            trib(0, 16, 16, 0, xx, yy, color);
+        } else if (shape === 9) {
+            // 绘制纹理映射三角形（使用精灵画布）
+            textri(0, 16, 16, 0, xx, yy, 0, 0, 32, 0, 0, 32, false, 0);
+        } else if (shape === 10) {
+            // 绘制纹理映射三角形（使用地图）
+            textri(0, 16, 16, 0, xx, yy, 0, 0, 32, 0, 0, 32, true, 0);
+        }
+    } else {
+        x = -1;
+        y = -1;
+    }
+
+    if (btnp(4, 60, 10) || keyp(2, 60, 10)) {
+        // 改变颜色
+        color = (color + 1) % 16;
+    }
+    if (btnp(5)) {
+        // 改变绘制图形
+        shape = (shape + 1) % 11;
+    }
+    if (keyp(66)) {
+        trace("运行时间: " + time() + "毫秒"); // 输出运行时间到命令行
+        exit(); // 退出程序
+    }
+    t = t + 1; // 更新计时器
+}
+
+```
