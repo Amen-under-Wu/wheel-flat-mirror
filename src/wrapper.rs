@@ -79,7 +79,9 @@ impl WheelWrapper {
                     }
                 }
                 self.state = WrapperState::Idle;
-                self.cart.borrow_mut().set_file_ptr(Rc::new(RefCell::new(WheelFile::new_default())));
+                self.cart
+                    .borrow_mut()
+                    .set_file_ptr(Rc::new(RefCell::new(WheelFile::new_default())));
                 self.cart.borrow_mut().sync(255, 0, false);
                 self.system.borrow_mut().exit_flag = false;
             }
@@ -93,7 +95,7 @@ impl WheelWrapper {
                         self.system
                             .borrow_mut()
                             .trace(&format!("文件 {} 上传成功", self.active_name), 13);
-                    },
+                    }
                     Err(e) => {
                         self.system
                             .borrow_mut()
@@ -520,7 +522,10 @@ impl crate::WheelProgram for WheelWrapper {
 
         for i in 0..4 {
             let offset = i * Ram::SOUND_REGISTER_SIZE + Ram::SOUND_REGISTERS_OFFSET;
-            let freq_vol = u16::from_le_bytes([self.cart.borrow().peek(offset), self.cart.borrow().peek(offset + 1)]);
+            let freq_vol = u16::from_le_bytes([
+                self.cart.borrow().peek(offset),
+                self.cart.borrow().peek(offset + 1),
+            ]);
             let freq = freq_vol & ((1 << 12) - 1);
             let vol = (freq_vol >> 12) as u8;
             let mut waveform = [0; 32];

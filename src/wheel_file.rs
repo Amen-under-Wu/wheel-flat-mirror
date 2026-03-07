@@ -41,14 +41,14 @@ impl WheelFile {
                 Chunk {
                     chunk_type: ChunkType::Tiles,
                     bank: 0,
-                    data: crate::data::tic80_mascot_spr(),
+                    data: crate::data::mascot_spr(),
                 },
                 Chunk {
                     chunk_type: ChunkType::Palette,
                     bank: 0,
                     data: crate::data::tic80_palette().to_vec(),
-                }
-            ]
+                },
+            ],
         }
     }
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
@@ -70,11 +70,13 @@ impl WheelFile {
                 17 => ChunkType::Default,
                 18 => ChunkType::Screen,
                 19 => ChunkType::Binary,
-                _ => return Err(format!(
-                    "Unknown chunk type: {} at offset {}",
-                    bytes[offset] & 31,
-                    offset
-                )),
+                _ => {
+                    return Err(format!(
+                        "Unknown chunk type: {} at offset {}",
+                        bytes[offset] & 31,
+                        offset
+                    ));
+                }
             };
 
             let bank = bytes[offset] >> 5;
