@@ -7,13 +7,10 @@ mod web_bindings;
 mod wheel_file;
 mod wrapper;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext as GL;
 
 use crate::script::WheelScript;
-use crate::script::js::JsScript;
 
 struct WheelContext {
     screen: Box<dyn io_device::Display>,
@@ -35,7 +32,10 @@ impl WheelContext {
             .expect("canvas element not found")
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .unwrap();
-        let ratio = 800 / (240 + 16);
+        let container = document
+            .get_element_by_id("container")
+            .expect("container not found");
+        let ratio = container.client_width() as u32 / (240 + 16);
         canvas.set_width((240 + 16) * ratio);
         canvas.set_height((136 + 8) * ratio);
         let gl = canvas
@@ -171,5 +171,8 @@ impl Wheel {
     pub fn update(&mut self) {
         self.program.update(&mut self.context);
         self.context.update();
+    }
+    pub fn resize(&mut self, new_w: u32) {
+        self.context.screen.resize(new_w);
     }
 }

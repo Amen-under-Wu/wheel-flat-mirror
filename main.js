@@ -31,10 +31,19 @@ export function main() {
     document.querySelector("canvas").focus();
     const wheel = Wheel.new();
     window.wheel = wheel;
+    window.onresize = function() {
+        let w = document.getElementById("container").clientWidth;
+        let canvas = document.getElementById("canvas");
+        let r = Math.max(Math.floor(w / (240 + 16)), 2);
+        canvas.width = r * (240 + 16);
+        canvas.height = r * (136 + 8);
+        window.wheel.resize(canvas.width);
+    }
     start_loop(() => {
         wheel.update();
     });
 }
+
 
 window.buttonCallback = main;
 

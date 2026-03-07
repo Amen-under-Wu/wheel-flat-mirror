@@ -1,5 +1,6 @@
 pub trait Display {
     fn display_screen(&mut self, screen_buffer: &Vec<u8>);
+    fn resize(&mut self, w: u32);
 }
 
 #[derive(Copy, Clone)]

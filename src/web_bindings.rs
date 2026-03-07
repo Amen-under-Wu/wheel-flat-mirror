@@ -145,6 +145,9 @@ impl Display for Screen {
         self.update(screen_buffer);
         self.display();
     }
+    fn resize(&mut self, w: u32) {
+        self.adjust_size(w as f32);
+    }
 }
 
 pub struct DummySpeaker {}
