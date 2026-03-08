@@ -1,0 +1,298 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{dirtree}
+
+\title{说明文档 - WheelFlat轮扁}
+\author{后面忘了但是你说的队}
+\date{\today}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{orange},
+    numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+    \textit{輮以为轮，其曲中规。} \\
+    \textit{闭门造车，出门合辙。}
+\end{center}
+\sloppy
+\section{项目简述}
+
+本项目希望“重复造轮子”，基于 web 平台实现梦幻主机 TIC-80 的大部分功能，并在此基础上实现两点突破：
+
+\begin{itemize}
+    \item 实现对中文字体的支持；
+    \item RIIR。
+\end{itemize}
+
+\section{项目结构}
+
+当前项目的目录结构大致如下所示。
+
+\newpage
+
+\dirtree{%
+  .1 \textcolor{blue}{wheel-flat}.
+  .2 \textcolor{blue}{data} \textcolor{gray}{字体等必要的二进制数据}.
+  .2 \textcolor{blue}{doc} \textcolor{gray}{项目文档}.
+  .2 \textcolor{blue}{src} \textcolor{gray}{Rust源码}.
+  .3 \textcolor{blue}{cartridge}.
+  .4 pix\_mask.rs \textcolor{gray}{细化像素相关结构体}.
+  .4 ram.rs \textcolor{gray}{“运行时内存”相关结构体}.
+  .3 cartridge.rs \textcolor{gray}{“卡带”结构接口封装}.
+  .3 data.rs \textcolor{gray}{相关二进制数据的Rust封装}.
+  .3 io\_device.rs \textcolor{gray}{输入输出接口定义}.
+  .3 lib.rs \textcolor{gray}{向浏览器环境导出的接口}.
+  .3 \textcolor{blue}{script}.
+  .4 js\_prelude.js \textcolor{gray}{可变参数js函数的封装}.
+  .4 js.rs \textcolor{gray}{js脚本执行相关函数封装}.
+  .3 script.rs \textcolor{gray}{“脚本”结构抽象}.
+  .3 system.rs \textcolor{gray}{系统console等相关结构接口封装}.
+  .3 web\_bindings.rs \textcolor{gray}{浏览器环境下输入输出接口的具体实现}.
+  .3 wheel\_file.rs \textcolor{gray}{.wf 文件二进制结构定义}.
+  .3 wrapper.rs \textcolor{gray}{整合“卡带” “系统” “脚本”的相关接口}.
+  .2 {Cargo.toml}.
+  .2 {index.html} \textcolor{gray}{前端html}.
+  .2 {main.js} \textcolor{gray}{js与Rust的交互}.
+  .2 {readme.md}.
+}
+
+在具体内部实现层面，当前的程序架构大致如下：
+
+\begin{itemize}
+    \item \textbf{底层}：\texttt{WheelContext} 提供绘图、播放声音（待实现）、捕获输入、读写文件等接口，供 \texttt{dyn WheelProgram} 调用。
+    \item \textbf{中层}：\texttt{CartContext} 提供内存布局及相关的各种功能接口，\texttt{SystemContext} 提供终端输出、获取时间、退出程序等接口；\texttt{WheelWrapper} 持有二者的共享所有权，将其接口暴露给 \texttt{dyn InternalProgram} 使用，并实现 \texttt{trait WheelProgram}。
+    \item \textbf{上层}：JsScript 实现 \texttt{trait InternalProgram}，整合 Wrapper 中的接口到 js 环境，供内部存储的 js 脚本调用。
+\end{itemize}
+
+\section{使用说明}
+
+目前内置编辑器尚未实现，因此用户只能通过上传外部编辑器生成的二进制文件运行自制程序。二进制文件的编码格式除代码文本部分不支持压缩/解压缩之外，其余大部分与 \texttt{.tic} 文件格式相同，详见 \href{https://github.com/nesbox/TIC-80/wiki/.tic-File-Format}{TIC-80 官方文档}。由于 web 平台对许多 rust 库支持有限，WheelFlat 目前仅支持使用 javascript 编写脚本。一个取巧的测试方式为利用 TIC-80 编辑 js 卡带，保存为 \texttt{.tic} 格式后修改后缀名为 \texttt{.wf}，之后上传到本网站运行。编辑时应注意回调函数名的区别。
+
+\subsection{可用命令}
+
+当前的命令行界面仍十分简陋，并\textbf{不}支持选中、粘贴、记忆命令、自动补全、光标移动等功能。当前可用的命令为：
+
+\begin{itemize}
+    \item \texttt{clear}：清空终端显示的文字
+    \item \texttt{upload <filename>}：上传文件并加载，文件在内部将被命名为 \texttt{<filename>}。
+    \item \texttt{run}：运行当前加载的文件。
+    \item \texttt{save}：保存当前加载的文件到本地。
+\end{itemize}
+
+\subsection{接口}
+
+脚本中可用的 api 参考了 TIC-80 的格式，下文将列举目前已实现的接口。
+
+\subsubsection{回调函数}
+
+\begin{itemize}
+    \item \texttt{init()}：在程序启动时执行一次，相当于 TIC-80 的 \texttt{BOOT}。
+    \item \texttt{update()}：每帧执行一次，相当于 TIC-80 的 \texttt{TIC}。
+    \item \texttt{scanline(i)}：每帧绘制屏幕上的第 \texttt{i} 行像素时执行，相当于 TIC-80 的 \texttt{BDR}。
+    \item \texttt{overlay()}：每帧绘制 \texttt{Vram} 中的第二个 bank 前执行，相当于 TIC-80 的 \texttt{OVR}。
+\end{itemize}
+
+\subsubsection{绘图函数}
+
+\begin{itemize}
+    \item \texttt{circ(x, y, r, color)}：以 \texttt{(x,y)} 为圆心绘制半径为 \texttt{r} 像素且颜色为 \texttt{color} 的实心圆形。
+    \item \texttt{circb(x, y, r, color)}：以 \texttt{(x,y)} 为圆心绘制半径为 \texttt{r} 像素且颜色为 \texttt{color} 的空心圆形。
+    \item \texttt{elli(x, y, a, b, color)}：以 \texttt{(x,y)} 为中心，绘制 x 方向半轴长为 \texttt{a} 像素，y 方向半轴长为 \texttt{b} 像素，颜色为 \texttt{color} 的实心圆形。
+    \item \texttt{ellib(x, y, a, b, color)}：以 \texttt{(x,y)} 为中心，绘制 x 方向半轴长为 \texttt{a} 像素，y 方向半轴长为 \texttt{b} 像素，颜色为 \texttt{color} 的空心圆形。
+    \item \texttt{clip(x, y, w, h)}：将屏幕的可绘制区域限制为左上顶点坐标为 \texttt{(x,y)}，宽为 \texttt{w}，高为 \texttt{h} 的矩形区域。
+    \item \texttt{clip()}：重置屏幕的可绘制区域。
+    \item \texttt{cls(color=0)}：将屏幕用 \texttt{color} 颜色的像素填充。
+    \item \texttt{line(x1, y1, x2, y2, color)}：绘制一条连接 \texttt{(x1,y1)} 和 \texttt{(x2,y2)} 两点且颜色为 \texttt{color} 的直线。
+    \item \texttt{map(x=0, y=0, w=30, h=17, sx=0, sy=0, trans\_color=-1, scale=1, remap)}：在屏幕上以 \texttt{(x,y)} 为左上顶点绘制地图，绘制的地图块为大地图的一个矩形区域，矩形左上顶点为 \texttt{(sx,sy)} 对应的地图块，横向宽 \texttt{w} 个地图块、纵向高 \texttt{h} 个地图块，缩放比例为 \texttt{scale}，绘制时颜色为 \texttt{trans\_color} 的像素保持透明；\texttt{remap} 为可选的回调函数，接受被绘制的地图块的 \texttt{id} 与在地图上的坐标为传入参数，输出新的地图块 \texttt{id} 和 \texttt{flip} \texttt{rotate} 参数，以调整该地图块实际的绘制方式。
+    \item \texttt{pix(x, y, color)}：将像素 \texttt{(x,y)} 的颜色设置为 \texttt{color}。
+    \item \texttt{pix(x, y) -> color}：获取像素 \texttt{(x,y)} 的颜色。
+    \item \texttt{print(text, x=0, y=0, color=12, fixed=false, scale=1, alt\_font=false) -> text\_width}：在屏幕上以 \texttt{color} 颜色绘制字符串 \texttt{text} 的文字，绘制出文字的左上坐标为 \texttt{(x,y)}，缩放比例为 \texttt{scale}，绘制出文字的总宽度为 \texttt{text\_width}；\texttt{fixed} 控制文字是否定宽，\texttt{alt\_font} 控制绘制所使用的文字字体。
+    \item \texttt{print\_ch(text, x=0, y=0, color=12, fixed=false, scale=1, alt\_font=false) -> text\_width}：与 \texttt{print} 类似，但支持以寒蝉点阵体绘制 \texttt{text} 中的中文字符（暂不支持中文标点）；\texttt{alt\_font} 为 \texttt{true} 时使用寒蝉点阵体的 7px 字体，否则使用 16px 字体。
+    \item \texttt{rect(x, y, w, h, color)}：绘制左上顶点为 \texttt{(x,y)}，宽 \texttt{w} 像素，高 \texttt{h} 像素，颜色为 \texttt{color} 的实心矩形。
+    \item \texttt{rectb(x, y, w, h, color)}：绘制左上顶点为 \texttt{(x,y)}，宽 \texttt{w} 像素，高 \texttt{h} 像素，颜色为 \texttt{color} 的空心矩形。
+    \item \texttt{spr(id, x, y, trans\_color=-1, scale=1, flip=0, rotate=0, w=1, h=1)}：绘制矩形精灵图，左上顶点为 \texttt{(x,y)}，缩放比例为 \texttt{scale}，被绘制的精灵在画布上左上角精灵单元 id 为 \texttt{id}，宽 \texttt{w} 个精灵单元，高 \texttt{h} 个精灵单元；颜色为 \texttt{trans\_color} 的像素绘制为透明；\texttt{flip} 与 \texttt{rotate} 控制精灵的旋转与对称，旋转优先于对称，具体参见 TIC-80 文档。
+    \item \texttt{tri(x1, y1, x2, y2, x3, y3, color)}：绘制顶点坐标为 \texttt{(x1,y1)} \texttt{(x2,y2)} \texttt{(x3,y3)}，颜色为 \texttt{color} 的实心三角形。
+    \item \texttt{trib(x1, y1, x2, y2, x3, y3, color)}：绘制顶点坐标为 \texttt{(x1,y1)} \texttt{(x2,y2)} \texttt{(x3,y3)}，颜色为 \texttt{color} 的空心三角形。
+    \item \texttt{textri(x1, y1, x2, y2, x3, y3, u1, v1, u2, v2, u3, v3, use\_map=false, trans\_color=-1)}：将纹理上顶点坐标为 \texttt{(u1,v1)} \texttt{(u2,v2)} \texttt{(u3,v3)} 的三角形区域映射到屏幕上顶点坐标为 \texttt{(x1,y1)} \texttt{(x2,y2)} \texttt{(x3,y3)} 的三角形区域，\texttt{use\_map} 为 \texttt{true} 时纹理图为地图，否则为精灵画布；颜色为 \texttt{trans\_color} 的像素绘制为透明。
+\end{itemize}
+
+\subsubsection{输入函数}
+
+\begin{itemize}
+    \item \texttt{btn(id) -> bool}：在 \texttt{id} 对应的键已被按下时返回真。
+    \item \texttt{btnp(id) -> bool}：在 \texttt{id} 对应的键被按下且该键在前一帧中未被按下时返回真。
+    \item \texttt{btnp(id, hold, period=1) -> bool}：在 \texttt{id} 对应的键被按下时长为 0 帧或时长减去 \texttt{hold} 值不小于 0 且能被 \texttt{period} 整除时返回真。
+    \item \texttt{key() -> bool}：在键盘有输入时返回真。
+    \item \texttt{key(code) -> bool}：在键盘上 \texttt{code} 对应的键有输入时返回真。
+    \item \texttt{keyp() -> bool}：在键盘有某键被按下且该键在前一帧中未被按下时返回真。
+    \item \texttt{keyp(code) -> bool}：在键盘上 \texttt{code} 对应的键被按下且该键在前一帧中未被按下时返回真。
+    \item \texttt{keyp(code, hold, period=1) -> bool}：在 \texttt{code} 对应的键被按下时长为 0 帧或时长减去 \texttt{hold} 值不小于 0 且能被 \texttt{period} 整除时返回真。
+    \item \texttt{mouse() -> [x, y, left, middle, right, scroll\_x, scroll\_y]}：返回鼠标指针的坐标、各按键状态和滚轮状态。
+\end{itemize}
+
+\subsubsection{内存操作函数}
+
+\begin{itemize}
+    \item \texttt{memcpy(to, from, len)}：将 \texttt{Ram} 中首地址为 \texttt{from}，长度为 \texttt{len} 的一段数据复制到首地址为 \texttt{to} 的区域中。
+    \item \texttt{memset(addr, val, len)}：将 \texttt{Ram} 中首地址为 \texttt{addr}，长度为 \texttt{len} 的区域内数值均设为 \texttt{val}。
+    \item \texttt{peek(addr) -> val}：查看 \texttt{Ram} 中地址为 \texttt{addr} 的数值。
+    \item \texttt{peek(addr, bits) -> val}：将 \texttt{Ram} 以小端序展开为 bitmap，每 \texttt{bits} 位截断，查看第 \texttt{addr} 个 bits 对应的数值；\texttt{bits} 只能取 8 的因数。
+    \item \texttt{peek1(addr1) -> val1}：相当于 \texttt{peek(addr1, 1)}。
+    \item \texttt{peek2(addr2) -> val2}：相当于 \texttt{peek(addr2, 2)}。
+    \item \texttt{peek4(addr4) -> val4}：相当于 \texttt{peek(addr4, 4)}。
+    \item \texttt{poke(addr, val)}：将 \texttt{Ram} 中地址为 \texttt{addr} 的数值设为 \texttt{val}。
+    \item \texttt{poke(addr, val, bits)}：将 \texttt{Ram} 以小端序展开为 bitmap，每 \texttt{bits} 位截断，将第 \texttt{addr} 个 bits 对应的数值设置为 \texttt{val}；\texttt{bits} 只能取 8 的因数。
+    \item \texttt{poke1(addr1, val1)}：相当于 \texttt{poke(addr1, val1, 1)}。
+    \item \texttt{poke2(addr2, val2)}：相当于 \texttt{poke(addr2, val2, 2)}。
+    \item \texttt{poke4(addr4, val4)}：相当于 \texttt{poke(addr4, val4, 4)}。
+    \item \texttt{sync(mask, bank, to\_cart=false)}：将 \texttt{Ram} 中的信息存储进卡带，或将卡带中的信息读取到 \texttt{Ram}。
+    \item \texttt{vbank(bank)}：将当前 \texttt{Vram} 使用的 bank 切换为编号 \texttt{bank} 的 bank。
+\end{itemize}
+
+\subsubsection{实用函数}
+
+\begin{itemize}
+    \item \texttt{fget(id, flag) -> val}：获取 \texttt{id} 对应 \texttt{sprite} 的第 \texttt{flag} 个 flag 值。
+    \item \texttt{fset(id, flag, val)}：设置 \texttt{id} 对应 \texttt{sprite} 的第 \texttt{flag} 个 flag 值。
+    \item \texttt{mget(x, y) -> id}：获取大地图上坐标为 \texttt{(x,y)} 的地图块的 \texttt{id}。
+    \item \texttt{mset(x, y) -> id}：设置大地图上坐标为 \texttt{(x,y)} 的地图块的 \texttt{id}。
+\end{itemize}
+
+\subsubsection{系统函数}
+
+\begin{itemize}
+    \item \texttt{exit()}：退出到命令行界面。
+    \item \texttt{time()}：获取程序启动以来的毫秒数。
+    \item \texttt{tstamp()}：获取当前的秒级 UNIX 时间戳。
+    \item \texttt{trace(text, color=15)}：向命令行的“标准输出”写入字符串 \texttt{text}，以颜色 \texttt{color} 显示。
+\end{itemize}
+
+\subsection{示例代码}
+
+\begin{lstlisting}
+let t = 0;
+let x = 0;
+let y = 0;
+let sx = 96;
+let sy = 24;
+let shape = 0;
+let color = 1;
+function init() {
+    poke(0x4000, 0x22); // 设置id为0的sprite左上角的两个像素为红色
+    poke(0x8000, 1); // 设置地图左上角的地图块为id为1的tile（即tic-80吉祥物的左上部分）
+    trace("运行demo", 13); // 输出信息到命令行
+}
+
+function update() {
+    cls(13); // 刷新屏幕
+    map(1, 1, 10, 10, 0, 0, 255, 1); // 绘制地图
+
+    // 绘制文字
+    print_ch("你好wheel flat轮扁!", 84, 84, 0, false, 1, false);
+    print_ch("你好wheel flat轮扁!", 84, 94, 0, false, 1, true);
+    print_ch("按esc回到终端", 84, 104, 0, false, 1, false);
+
+    // 控制吉祥物移动
+    if (btn(0)) {
+        sy = sy - 1;
+    }
+    if (btn(1)) {
+        sy = sy + 1;
+    }
+    if (btn(2)) {
+        sx = sx - 1;
+    }
+    if (btn(3)) {
+        sx = sx + 1;
+    }
+
+    // 绘制吉祥物
+    spr(1 + Math.floor(t % 60 / 30) * 2, sx, sy, 14, 3, 0, 0, 2, 2);
+
+    // 控制鼠标绘图
+    let [xx, yy, left,] = mouse();
+    if (left) {
+        if (x === -1) {
+            x = xx;
+            y = yy;
+        }
+        if (shape === 0) {
+            // 绘制实心长方形
+            rect(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 1) {
+            // 绘制空心长方形
+            rectb(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 2) {
+            // 绘制实心圆形
+            circ(x, y, Math.sqrt((xx - x) ** 2 + (yy - y) ** 2), color);
+        } else if (shape === 3) {
+            // 绘制空心圆形
+            circb(x, y, Math.sqrt((xx - x) ** 2 + (yy - y) ** 2), color);
+        } else if (shape === 4) {
+            // 绘制实心椭圆形
+            elli(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 5) {
+            // 绘制空心椭圆形
+            ellib(x, y, Math.abs(xx - x) + 1, Math.abs(yy - y) + 1, color);
+        } else if (shape === 6) {
+            // 绘制直线
+            line(x, y, xx, yy, color);
+        } else if (shape === 7) {
+            // 绘制实心三角形
+            tri(0, 16, 16, 0, xx, yy, color);
+        } else if (shape === 8) {
+            // 绘制空心三角形
+            trib(0, 16, 16, 0, xx, yy, color);
+        } else if (shape === 9) {
+            // 绘制纹理映射三角形（使用精灵画布）
+            textri(0, 16, 16, 0, xx, yy, 0, 0, 32, 0, 0, 32, false, 0);
+        } else if (shape === 10) {
+            // 绘制纹理映射三角形（使用地图）
+            textri(0, 16, 16, 0, xx, yy, 0, 0, 32, 0, 0, 32, true, 0);
+        }
+    } else {
+        x = -1;
+        y = -1;
+    }
+
+    if (btnp(4, 60, 10) || keyp(2, 60, 10)) {
+        // 改变颜色
+        color = (color + 1) % 16;
+    }
+    if (btnp(5)) {
+        // 改变绘制图形
+        shape = (shape + 1) % 11;
+    }
+    if (keyp(66)) {
+        trace("运行时间: " + time() + "毫秒"); // 输出运行时间到命令行
+        exit(); // 退出程序
+    }
+    t = t + 1; // 更新计时器
+}
+\end{lstlisting}
+
+\end{document}
