@@ -64,6 +64,10 @@ function map(x = 0, y = 0, w = 30, h = 17, sx = 0, sy = 0, trans_color = -1, sca
 
 }
 
+function music(track = -1, frame = -1, row = -1, loop = true) {
+    // unfinished
+}
+
 function peek(addr, bits = 8) {
     if (bits === 8) {
         return peek_1(addr);
@@ -106,6 +110,10 @@ function print(text, x = 0, y = 0, color = 12, fixed = false, scale = 1, alt_fon
 
 function print_ch(text, x = 0, y = 0, color = 12, fixed = false, scale = 1, alt_font = false) {
     return print_ch_7(text, x, y, color, fixed, scale, alt_font);
+}
+
+function sfx(id, note = -1, duration = -1, channel = 0, volume = 15, speed = 0) {
+    // unfinished
 }
 
 function spr(id, x, y, trans_color = -1, scale = 1, flip = 0, rotate = 0, w = 1, h = 1) {
