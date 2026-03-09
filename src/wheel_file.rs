@@ -81,6 +81,21 @@ impl WheelFile {
 
             let bank = bytes[offset] >> 5;
             let length = u16::from_le_bytes([bytes[offset + 1], bytes[offset + 2]]) as usize;
+            if length == 0 && chunk_type == ChunkType::Code {
+                let mut data = Vec::new();
+                offset = offset + 4;
+                while bytes[offset] != 0 {
+                    data.push(bytes[offset]);
+                    offset += 1;
+                }
+                offset += 1;
+                chunks.push(Chunk {
+                    chunk_type,
+                    bank,
+                    data,
+                });
+                continue;
+            }
             if offset + 4 + length > bytes.len() {
                 return Err(format!(
                     "Chunk data exceeds file length at offset {}",
@@ -104,8 +119,18 @@ impl WheelFile {
 
         for chunk in &self.chunks {
             let chunk_type_byte = (chunk.chunk_type as u8) | (chunk.bank << 5);
-            let length_bytes = (chunk.data.len() as u16).to_le_bytes();
+            let l = chunk.data.len();
+            if let ChunkType::Code = chunk.chunk_type {
+                if l > u16::MAX.into() {
+                    // c-style string for long scripts
+                    bytes.extend([chunk_type_byte, 0, 0, 0].iter());
+                    bytes.extend_from_slice(&chunk.data);
+                    bytes.push(0);
+                    continue;
+                }
+            }
 
+            let length_bytes = (l as u16).to_le_bytes();
             bytes.push(chunk_type_byte);
             bytes.extend_from_slice(&length_bytes);
             bytes.push(0); // Reserved byte
