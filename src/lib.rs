@@ -65,7 +65,7 @@ impl WheelContext {
 
         Self {
             screen: Box::new(screen),
-            speaker: Box::new(web_bindings::DummySpeaker::new()),
+            speaker: Box::new(web_bindings::Speaker::new()),
             file_io: Box::new(web_bindings::FileDevice::new()),
             vbuffer: vec![
                 0;

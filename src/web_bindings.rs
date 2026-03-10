@@ -150,15 +150,51 @@ impl Display for Screen {
     }
 }
 
-pub struct DummySpeaker {}
-impl DummySpeaker {
+pub struct Speaker {
+    worklet_call: js_sys::Function,
+    phases: [f32; 4],
+    buffer: [f32; Self::BUFFER_LEN],
+}
+impl Speaker {
+    const BUFFER_LEN: usize = 48000 / 60;
     pub fn new() -> Self {
-        Self {}
+        let window = web_sys::window().expect("no global window exists");
+        let worklet_call = js_sys::Reflect::get(&window, &"append_wave".into())
+            .unwrap()
+            .dyn_into::<js_sys::Function>()
+            .unwrap();
+        Self {
+            worklet_call,
+            phases: [0.0; 4],
+            buffer: [0.0; Self::BUFFER_LEN],
+        }
     }
 }
-impl PlayRegister for DummySpeaker {
-    fn set_registers(&mut self, _reg: &[WheelSoundRegister]) {
-        // do nothing
+impl PlayRegister for Speaker {
+    fn set_registers(&mut self, reg: &[WheelSoundRegister]) {
+        self.buffer.fill(0.0);
+        for i in 0..4 {
+            let freq = reg[i].freq;
+            let vol = reg[i].volumn;
+            for j in 0..Self::BUFFER_LEN {
+                self.buffer[j] = self.buffer[j]
+                    + (reg[i].waveform[(((32 * j * freq as usize) as f32
+                        / (60 * Self::BUFFER_LEN) as f32
+                        + self.phases[i] * 32.0)
+                        % 32.0)
+                        .floor() as usize]
+                        * vol) as f32
+                        / (15.0 * 2.0)
+                    - 0.25;
+            }
+            self.phases[i] = (self.phases[i] + ((freq as f32 / 60.0) % 1.0)) % 1.0;
+        }
+        self.worklet_call
+            .call1(
+                &JsValue::NULL,
+                &js_sys::Float32Array::new_from_slice(&self.buffer),
+            )
+            .unwrap();
     }
 }
 

@@ -533,6 +533,11 @@ impl crate::WheelProgram for WheelWrapper {
                 waveform[j] = self.cart.borrow().peek4((offset + 2) * 2 + j);
             }
             wheel.play(i, waveform, vol, freq);
+
+            // update the registers with sfx things, here just clearing it
+            for j in 0..Ram::SOUND_REGISTER_SIZE {
+                self.cart.borrow_mut().poke(offset + j, 0);
+            }
         }
 
         if !self.file_out_buffer.is_empty() {

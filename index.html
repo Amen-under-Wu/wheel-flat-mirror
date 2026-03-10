@@ -56,12 +56,21 @@
     <input type="file" id="fileInput" style="display:none;" accept=".wf" onchange="loadFile()">
     
     <script type="module" src="main.js"></script>
+    <script type="module" src="audio_player.js"></script>
     <script>
+        async function init_player() {
+            await DynamicWaveformPlayer.init();
+            await DynamicWaveformPlayer.play();
+        }
+        function append_wave(waveform) {
+            DynamicWaveformPlayer.appendWaveform(waveform);
+        }
         window.onload = function() {
             document.getElementById('cover-title').innerText = '点击开始';
             let cover = document.getElementById('cover');
             cover.style.cursor = 'pointer';
-            cover.onclick = function() {
+            cover.onclick = async function() {
+                await init_player();
                 let cover = document.getElementById('cover');
                 cover.style.display = 'none';
                 buttonCallback();
