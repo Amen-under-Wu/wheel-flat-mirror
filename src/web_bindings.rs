@@ -154,6 +154,7 @@ pub struct Speaker {
     worklet_call: js_sys::Function,
     phases: [f32; 4],
     buffer: [f32; Self::BUFFER_LEN],
+    lfsr: Lfsr,
 }
 impl Speaker {
     const BUFFER_LEN: usize = 48000 / 60;
@@ -167,6 +168,7 @@ impl Speaker {
             worklet_call,
             phases: [0.0; 4],
             buffer: [0.0; Self::BUFFER_LEN],
+            lfsr: Lfsr::new(1),
         }
     }
 }
@@ -176,16 +178,48 @@ impl PlayRegister for Speaker {
         for i in 0..4 {
             let freq = reg[i].freq;
             let vol = reg[i].volumn;
-            for j in 0..Self::BUFFER_LEN {
-                self.buffer[j] = self.buffer[j]
-                    + (reg[i].waveform[(((32 * j * freq as usize) as f32
+            if freq == 0 || vol == 0 {
+                continue;
+            }
+            let all_0 = reg[i].waveform.iter().all(|&x| x == 0);
+            let all_1 = reg[i].waveform.iter().all(|&x| x == 15);
+            if all_0 || all_1 {
+                let count = 1;
+                let vol_float = 0.25 * vol as f32 / 15.0;
+                let mut val = if self.lfsr.get(all_1) {
+                    vol_float
+                } else {
+                    -vol_float
+                };
+                let mut count = 0;
+                for j in 0..Self::BUFFER_LEN {
+                    let waveform_j = (((16 * j * freq as usize) as f32
                         / (60 * Self::BUFFER_LEN) as f32
-                        + self.phases[i] * 32.0)
-                        % 32.0)
-                        .floor() as usize]
-                        * vol) as f32
-                        / (15.0 * 2.0)
-                    - 0.25;
+                        + self.phases[i] * 16.0)
+                        % 16.0)
+                        .floor() as usize;
+                    if waveform_j > count {
+                        count = waveform_j;
+                        val = if self.lfsr.get(all_1) {
+                            vol_float
+                        } else {
+                            -vol_float
+                        };
+                    }
+                    self.buffer[j] += val;
+                }
+            } else {
+                for j in 0..Self::BUFFER_LEN {
+                    self.buffer[j] = self.buffer[j]
+                        + (reg[i].waveform[(((32 * j * freq as usize) as f32
+                            / (60 * Self::BUFFER_LEN) as f32
+                            + self.phases[i] * 32.0)
+                            % 32.0)
+                            .floor() as usize]
+                            * vol) as f32
+                            / (15.0 * 2.0)
+                        - 0.25;
+                }
             }
             self.phases[i] = (self.phases[i] + ((freq as f32 / 60.0) % 1.0)) % 1.0;
         }

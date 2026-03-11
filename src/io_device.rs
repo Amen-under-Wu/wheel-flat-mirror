@@ -25,6 +25,18 @@ pub trait PlayRegister {
     fn set_registers(&mut self, reg: &[WheelSoundRegister]);
 }
 
+pub struct Lfsr(u16);
+impl Lfsr {
+    pub fn new(val: u16) -> Self {
+        Self(val)
+    }
+    pub fn get(&mut self, mode_flag: bool) -> bool {
+        let bit = (self.0 ^ (self.0 >> (if mode_flag { 6 } else { 1 }))) & 1;
+        self.0 = (self.0 | (bit << 14)) >> 1;
+        (self.0 & 1) != 0
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct MouseData {
     pub left: bool,
