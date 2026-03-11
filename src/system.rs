@@ -1,4 +1,3 @@
-use crate::wheel_file::WheelFile;
 use js_sys::Date;
 
 pub struct SystemContext {

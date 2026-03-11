@@ -8,7 +8,7 @@ use crate::{
     wheel_file::{Savable, WheelFile},
 };
 use js_sys::Date;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 enum Command {
     None,

@@ -10,8 +10,6 @@ mod wrapper;
 use wasm_bindgen::prelude::*;
 use web_sys::WebGl2RenderingContext as GL;
 
-use crate::script::WheelScript;
-
 struct WheelContext {
     screen: Box<dyn io_device::Display>,
     speaker: Box<dyn io_device::PlayRegister>,
