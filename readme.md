@@ -29,9 +29,9 @@ http-server
 
 ## TODO
 
-- [ ] 用Rust调用web api
+- [x] 用Rust调用web api
   - [x] 图像api
-  - [ ] 音频api
+  - [x] 音频api (?)
   - [x] 键盘api
   - [x] 鼠标api
 - [x] 封装底层接口，实现系统内核
