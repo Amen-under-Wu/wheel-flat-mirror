@@ -42,7 +42,7 @@ http-server
     - [ ] font
   - [x] 输入函数
   - [ ] 音频函数
-    - [ ] sfx
+    - [x] sfx
     - [ ] music
   - [x] 内存操作函数
   - [x] 实用函数

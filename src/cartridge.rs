@@ -9,11 +9,34 @@ use crate::{
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+#[derive(Clone, Copy)]
+struct SfxRegister {
+    id: u8,
+    note: u8,
+    duration: i32,
+    volume: u8,
+    speed: i8,
+    timer: i32,
+}
+impl SfxRegister {
+    fn new() -> Self {
+        Self {
+            id: 255,
+            note: 255,
+            duration: -1,
+            volume: 0,
+            speed: 0,
+            timer: 0,
+        }
+    }
+}
+
 pub struct CartContext {
     pub ram: Ram,
     clip_rect: (i32, i32, i32, i32),
     pub key_timer: HashMap<u8, u32>,
     pub btn_timer: [i32; 32],
+    pub sfx_reg: [SfxRegister; 4],
     ch_font: (Vec<u8>, Vec<u8>),
     pub file_data: Rc<RefCell<WheelFile>>,
 }
@@ -26,6 +49,7 @@ impl CartContext {
             clip_rect: (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32),
             key_timer: HashMap::new(),
             btn_timer: [0; 32],
+            sfx_reg: [SfxRegister::new(); 4],
             ch_font: crate::data::ch_font(),
             file_data: Rc::new(RefCell::new(WheelFile::new())),
         }
@@ -1146,6 +1170,96 @@ impl CartContext {
             ((res >> 1) as i8) >> 2,
             ((res >> 7) as i8) >> 2,
         )
+    }
+
+    pub fn sfx(&mut self, id: u8, note: u8, duration: i32, channel: u8, volume: u8, speed: i8) {
+        self.sfx_reg[channel as usize] = SfxRegister {
+            id,
+            note,
+            duration,
+            volume,
+            speed,
+            timer: 0,
+        };
+        for i in 0..4 {
+            self.poke(Ram::SFX_STATE_OFFSET + channel as usize * 4 + i, 0);
+        }
+    }
+    const NOTE_FREQS: [u16; 96] = [
+        33, 35, 37, 39, 41, 44, 46, 49, 52, 55, 58, 62, 65, 69, 73, 78, 82, 87, 92, 98, 104, 110,
+        117, 123, 131, 139, 147, 156, 165, 175, 185, 196, 208, 220, 233, 247, 262, 277, 294, 311,
+        330, 349, 370, 392, 415, 440, 466, 494, 523, 554, 587, 622, 659, 698, 740, 784, 831, 880,
+        932, 988, 1047, 1109, 1175, 1245, 1319, 1397, 1480, 1568, 1661, 1760, 1865, 1976, 2093,
+        2217, 2349, 2489, 2637, 2794, 2960, 3136, 3322, 3520, 3729, 3951, 4186, 4435, 4699, 4978,
+        5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902,
+    ];
+    pub fn update_sound(&mut self) {
+        for i in 0..4 {
+            let reg = &mut self.sfx_reg[i];
+            let sfx_state_offset = Ram::SFX_STATE_OFFSET + i * 4;
+            if reg.timer == reg.duration {
+                reg.id = 255;
+            }
+            if reg.id >= 64 {
+                for j in 0..4 {
+                    self.poke(sfx_state_offset + j, 255);
+                }
+                continue;
+            }
+            let sr_offset = Ram::SOUND_REGISTERS_OFFSET + i * 18;
+            let sfx_offset = Ram::SFX_OFFSET + reg.id as usize * Ram::SFX_BYTE_SIZE;
+
+            let waveform_frame = self.peek(sfx_state_offset + 1) as usize;
+            self.memcpy(
+                Ram::WAVEFORMS_OFFSET
+                    + (self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * waveform_frame) as usize
+                        >> 4)
+                        * 16,
+                sr_offset + 2,
+                16,
+            );
+            let reg = self.sfx_reg[i].clone();
+            let vol_frame = self.peek(sfx_state_offset) as usize;
+            let frame_vol = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * vol_frame) & 0xf;
+            let volume = (frame_vol + reg.volume).saturating_sub(15).max(1);
+
+            let arp_frame = self.peek(sfx_state_offset + 2) as usize;
+            let arp = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * arp_frame + 1) & 0xf;
+            let pitch_frame = self.peek(sfx_state_offset + 3) as usize;
+            let pitch = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * pitch_frame + 1) << 4;
+            let pitch_sign = pitch >= 8;
+
+            let freq = Self::NOTE_FREQS[(reg.note + arp) as usize] + pitch as u16
+                - if pitch_sign { 16 } else { 0 }; // down arp and pitch16x to be added later
+
+            self.poke(sr_offset, (freq & 0xff) as u8);
+            self.poke(sr_offset + 1, (volume << 4) | (freq >> 8) as u8);
+
+            // update timer
+            let frame = if reg.speed >= 0 {
+                reg.timer * (reg.speed + 1) as i32
+            } else {
+                reg.timer / (1 - reg.speed) as i32
+            };
+            for j in 0..4 {
+                let loop_data = self.peek(sfx_offset + Ram::SFX_LOOP_OFFSET_SELF + j);
+                let start = (loop_data & 0xf) as i32;
+                let size = (loop_data >> 4) as i32;
+                let real_frame = if size == 0 {
+                    frame.min(Ram::SFX_FRAME_N as i32 - 1)
+                } else {
+                    if frame < start {
+                        frame
+                    } else {
+                        start + (frame - start) % size
+                    }
+                } as u8;
+                self.poke(sfx_state_offset + j, real_frame);
+            }
+
+            let reg = &mut self.sfx_reg[i];
+            reg.timer += 1;
+        }
     }
 
     fn load_from_cart(&mut self, mask: u8, bank: u8) {

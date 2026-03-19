@@ -65,6 +65,58 @@ impl std::ops::IndexMut<usize> for Vram {
     }
 }
 
+impl std::ops::Index<std::ops::Range<usize>> for Vram {
+    type Output = [u8];
+    fn index(&self, range: std::ops::Range<usize>) -> &[u8] {
+        &self.vbanks[self.active_vbank][range]
+    }
+}
+
+impl std::ops::IndexMut<std::ops::Range<usize>> for Vram {
+    fn index_mut(&mut self, range: std::ops::Range<usize>) -> &mut [u8] {
+        &mut self.vbanks[self.active_vbank][range]
+    }
+}
+
+impl std::ops::Index<std::ops::RangeFull> for Vram {
+    type Output = [u8];
+    fn index(&self, _: std::ops::RangeFull) -> &[u8] {
+        &self.vbanks[self.active_vbank][..]
+    }
+}
+
+impl std::ops::IndexMut<std::ops::RangeFull> for Vram {
+    fn index_mut(&mut self, _: std::ops::RangeFull) -> &mut [u8] {
+        &mut self.vbanks[self.active_vbank][..]
+    }
+}
+
+impl std::ops::Index<std::ops::RangeFrom<usize>> for Vram {
+    type Output = [u8];
+    fn index(&self, range: std::ops::RangeFrom<usize>) -> &[u8] {
+        &self.vbanks[self.active_vbank][range]
+    }
+}
+
+impl std::ops::IndexMut<std::ops::RangeFrom<usize>> for Vram {
+    fn index_mut(&mut self, range: std::ops::RangeFrom<usize>) -> &mut [u8] {
+        &mut self.vbanks[self.active_vbank][range]
+    }
+}
+
+impl std::ops::Index<std::ops::RangeTo<usize>> for Vram {
+    type Output = [u8];
+    fn index(&self, range: std::ops::RangeTo<usize>) -> &[u8] {
+        &self.vbanks[self.active_vbank][range]
+    }
+}
+
+impl std::ops::IndexMut<std::ops::RangeTo<usize>> for Vram {
+    fn index_mut(&mut self, range: std::ops::RangeTo<usize>) -> &mut [u8] {
+        &mut self.vbanks[self.active_vbank][range]
+    }
+}
+
 pub struct Ram {
     vram: Vram,
     ram: [u8; Self::SIZE - Vram::SIZE],
@@ -111,8 +163,17 @@ impl Ram {
     const WAVEFORMS_BYTE_SIZE: usize =
         Self::WAVEFORMS_N * Self::WAVEFORM_SAMPLE_N * Self::WAVEFORM_BPS / 8;
     pub const SFX_OFFSET: usize = Self::WAVEFORMS_OFFSET + Self::WAVEFORMS_BYTE_SIZE;
-    pub const SFX_BYTE_SIZE: usize = 4224;
-    pub const MUSIC_PATTERNS_OFFSET: usize = Self::SFX_OFFSET + Self::SFX_BYTE_SIZE;
+    pub const SFX_N: usize = 64;
+    pub const SFX_FRAME_N: usize = 30;
+    pub const SFX_FRAME_BYTE_SIZE: usize = 2;
+    pub const SFX_DATA_OFFSET_SELF: usize = Self::SFX_FRAME_BYTE_SIZE * Self::SFX_FRAME_N;
+    pub const SFX_DATA_BYTE_SIZE: usize = 2;
+    pub const SFX_LOOP_OFFSET_SELF: usize = Self::SFX_DATA_OFFSET_SELF + Self::SFX_DATA_BYTE_SIZE;
+    pub const SFX_LOOP_BYTE_SIZE: usize = 4;
+    pub const SFX_BYTE_SIZE: usize = Self::SFX_LOOP_OFFSET_SELF + Self::SFX_LOOP_BYTE_SIZE;
+    const SFX_BYTE_SIZE_TOTAL: usize =
+        Self::SFX_N * (Self::SFX_LOOP_OFFSET_SELF + Self::SFX_LOOP_BYTE_SIZE);
+    pub const MUSIC_PATTERNS_OFFSET: usize = Self::SFX_OFFSET + Self::SFX_BYTE_SIZE_TOTAL;
     pub const MUSIC_PATTERNS_BYTE_SIZE: usize = 11520;
     pub const MUSIC_TRACKS_OFFSET: usize =
         Self::MUSIC_PATTERNS_OFFSET + Self::MUSIC_PATTERNS_BYTE_SIZE;
@@ -181,6 +242,44 @@ impl std::ops::IndexMut<usize> for Ram {
             &mut self.vram[index]
         } else {
             &mut self.ram[index - Vram::SIZE]
+        }
+    }
+}
+
+impl std::ops::Index<std::ops::Range<usize>> for Ram {
+    type Output = [u8];
+
+    fn index(&self, range: std::ops::Range<usize>) -> &[u8] {
+        let start = range.start;
+        let end = range.end;
+
+        if end <= Vram::SIZE {
+            // 完全在 VRAM 中
+            &self.vram[start..end]
+        } else if start >= Vram::SIZE {
+            // 完全在 RAM 中
+            &self.ram[(start - Vram::SIZE)..(end - Vram::SIZE)]
+        } else {
+            // 跨边界的情况 - 不能直接返回连续 slice
+            panic!("Cannot create slice that spans VRAM and RAM boundaries");
+        }
+    }
+}
+
+impl std::ops::IndexMut<std::ops::Range<usize>> for Ram {
+    fn index_mut(&mut self, range: std::ops::Range<usize>) -> &mut [u8] {
+        let start = range.start;
+        let end = range.end;
+
+        if end <= Vram::SIZE {
+            // 完全在 VRAM 中
+            &mut self.vram[start..end]
+        } else if start >= Vram::SIZE {
+            // 完全在 RAM 中
+            &mut self.ram[(start - Vram::SIZE)..(end - Vram::SIZE)]
+        } else {
+            // 跨边界的情况
+            panic!("Cannot create mutable slice that spans VRAM and RAM boundaries");
         }
     }
 }
