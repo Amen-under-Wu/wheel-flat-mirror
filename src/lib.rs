@@ -164,7 +164,7 @@ struct Wheel {
 impl Wheel {
     pub fn new() -> Self {
         let context = WheelContext::new();
-        let program = Box::new(wrapper::WheelWrapper::new());
+        let program = Box::new(wrapper::WheelWrapper::new_with_command("fallspire"));
         Self { context, program }
     }
     pub fn update(&mut self) {

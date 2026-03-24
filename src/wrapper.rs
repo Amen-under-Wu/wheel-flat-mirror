@@ -68,6 +68,51 @@ impl WheelWrapper {
             file: WheelFile::new_demo(),
         }
     }
+    pub fn new_with_command(cmd: &str) -> Self {
+        let mut res = Self::new();
+        res.system.borrow_mut().input_buffer = cmd.to_string();
+        res.handle_input();
+        res
+    }
+    fn handle_input(&mut self) {
+        let input_lines =
+            SystemContext::split_line(&(">".to_string() + &self.system.borrow().input_buffer));
+        self.system
+            .borrow_mut()
+            .lines
+            .extend(input_lines.iter().map(|s| (s.clone(), 13)));
+        let in_str = self.system.borrow().input_buffer.clone();
+        match parse_command(in_str.as_str()) {
+            Command::None => {}
+            Command::Clear => self.system.borrow_mut().lines.clear(),
+            Command::Run => {
+                //self.cart.borrow_mut().sync(255, 0, false);
+                self.system.borrow_mut().program_timer = Date::now() as u64;
+                let mut script = JsScript::load(self.file.clone());
+                script.init(self.cart.clone(), self.system.clone());
+                self.state = WrapperState::Running(Box::new(script));
+            }
+            Command::Save => {
+                self.file_out_buffer = self.file.to_bytes();
+            }
+            Command::Upload(name) => {
+                self.active_name = name.clone();
+                self.file_in_buffer = Some(Vec::new());
+                self.upload_flag = true;
+            }
+            Command::Fallspire => {
+                self.system.borrow_mut().program_timer = Date::now() as u64;
+                let mut script = crate::examples::fallspire::FallSpire::new();
+                script.init(self.cart.clone(), self.system.clone());
+                self.state = WrapperState::Running(Box::new(script));
+            }
+            Command::Unknown => {
+                self.system.borrow_mut().trace("未知命令", 13);
+            }
+        }
+        self.system.borrow_mut().input_buffer.clear();
+        self.system.borrow_mut().scroll_to_bottom();
+    }
     fn self_update(&mut self) {
         if let WrapperState::Running(program) = &mut self.state {
             program.update();
@@ -143,41 +188,7 @@ impl WheelWrapper {
             self.system.borrow_mut().input_buffer.push(c);
         }
         if self.cart.borrow().keyp_with_hold_period(50, 60, 5) {
-            self.system
-                .borrow_mut()
-                .lines
-                .extend(input_lines.iter().map(|s| (s.clone(), 13)));
-            let in_str = self.system.borrow().input_buffer.clone();
-            match parse_command(in_str.as_str()) {
-                Command::None => {}
-                Command::Clear => self.system.borrow_mut().lines.clear(),
-                Command::Run => {
-                    //self.cart.borrow_mut().sync(255, 0, false);
-                    self.system.borrow_mut().program_timer = Date::now() as u64;
-                    let mut script = JsScript::load(self.file.clone());
-                    script.init(self.cart.clone(), self.system.clone());
-                    self.state = WrapperState::Running(Box::new(script));
-                }
-                Command::Save => {
-                    self.file_out_buffer = self.file.to_bytes();
-                }
-                Command::Upload(name) => {
-                    self.active_name = name.clone();
-                    self.file_in_buffer = Some(Vec::new());
-                    self.upload_flag = true;
-                }
-                Command::Fallspire => {
-                    self.system.borrow_mut().program_timer = Date::now() as u64;
-                    let mut script = crate::examples::fallspire::FallSpire::new();
-                    script.init(self.cart.clone(), self.system.clone());
-                    self.state = WrapperState::Running(Box::new(script));
-                }
-                Command::Unknown => {
-                    self.system.borrow_mut().trace("未知命令", 13);
-                }
-            }
-            self.system.borrow_mut().input_buffer.clear();
-            self.system.borrow_mut().scroll_to_bottom();
+            self.handle_input();
         }
         if self.cart.borrow().keyp_with_hold_period(51, 60, 5) {
             self.system.borrow_mut().input_buffer.pop();
