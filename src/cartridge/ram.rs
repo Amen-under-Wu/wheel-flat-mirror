@@ -223,6 +223,11 @@ impl Ram {
     pub fn get_subpixels_mut(&mut self) -> &mut PixMask {
         &mut self.vram.subpixels
     }
+    pub fn clear_overlay(&mut self) {
+        for i in 0..Vram::SCREEN_BYTE_SIZE {
+            self.vram.vbanks[1][i] = 0;
+        }
+    }
 }
 
 impl std::ops::Index<usize> for Ram {

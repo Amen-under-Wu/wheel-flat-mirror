@@ -17,6 +17,7 @@ enum Command {
     Save,
     Upload(String),
     Unknown,
+    Fallspire,
 }
 
 fn parse_command(input: &str) -> Command {
@@ -29,6 +30,7 @@ fn parse_command(input: &str) -> Command {
         Some("run") => Command::Run,
         Some("save") => Command::Save,
         Some("upload") if parts.len() > 1 => Command::Upload(parts[1].to_string()),
+        Some("fallspire") => Command::Fallspire,
         _ => Command::Unknown,
     }
 }
@@ -163,6 +165,12 @@ impl WheelWrapper {
                     self.active_name = name.clone();
                     self.file_in_buffer = Some(Vec::new());
                     self.upload_flag = true;
+                }
+                Command::Fallspire => {
+                    self.system.borrow_mut().program_timer = Date::now() as u64;
+                    let mut script = crate::examples::fallspire::FallSpire::new();
+                    script.init(self.cart.clone(), self.system.clone());
+                    self.state = WrapperState::Running(Box::new(script));
                 }
                 Command::Unknown => {
                     self.system.borrow_mut().trace("未知命令", 13);
@@ -486,6 +494,7 @@ impl crate::WheelProgram for WheelWrapper {
         }
 
         self.cart.borrow_mut().ram.set_active_vbank(1);
+        self.cart.borrow_mut().ram.clear_overlay();
         if let WrapperState::Running(prog) = &mut self.state {
             prog.overlay();
         }

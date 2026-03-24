@@ -184,7 +184,6 @@ impl PlayRegister for Speaker {
             let all_0 = reg[i].waveform.iter().all(|&x| x == 0);
             let all_1 = reg[i].waveform.iter().all(|&x| x == 15);
             if all_0 || all_1 {
-                let count = 1;
                 let vol_float = 0.25 * vol as f32 / 15.0;
                 let mut val = if self.lfsr.get(all_1) {
                     vol_float

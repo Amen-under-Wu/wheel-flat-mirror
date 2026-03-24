@@ -1,5 +1,6 @@
 mod cartridge;
 mod data;
+mod examples;
 mod io_device;
 mod script;
 mod system;
