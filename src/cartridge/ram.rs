@@ -160,7 +160,7 @@ impl Ram {
     const WAVEFORMS_N: usize = 16;
     const WAVEFORM_SAMPLE_N: usize = 32;
     const WAVEFORM_BPS: usize = 4; // bits per sample
-    const WAVEFORMS_BYTE_SIZE: usize =
+    pub const WAVEFORMS_BYTE_SIZE: usize =
         Self::WAVEFORMS_N * Self::WAVEFORM_SAMPLE_N * Self::WAVEFORM_BPS / 8;
     pub const SFX_OFFSET: usize = Self::WAVEFORMS_OFFSET + Self::WAVEFORMS_BYTE_SIZE;
     pub const SFX_N: usize = 64;
@@ -171,7 +171,7 @@ impl Ram {
     pub const SFX_LOOP_OFFSET_SELF: usize = Self::SFX_DATA_OFFSET_SELF + Self::SFX_DATA_BYTE_SIZE;
     pub const SFX_LOOP_BYTE_SIZE: usize = 4;
     pub const SFX_BYTE_SIZE: usize = Self::SFX_LOOP_OFFSET_SELF + Self::SFX_LOOP_BYTE_SIZE;
-    const SFX_BYTE_SIZE_TOTAL: usize =
+    pub const SFX_BYTE_SIZE_TOTAL: usize =
         Self::SFX_N * (Self::SFX_LOOP_OFFSET_SELF + Self::SFX_LOOP_BYTE_SIZE);
     pub const MUSIC_PATTERNS_OFFSET: usize = Self::SFX_OFFSET + Self::SFX_BYTE_SIZE_TOTAL;
     pub const MUSIC_PATTERNS_BYTE_SIZE: usize = 11520;

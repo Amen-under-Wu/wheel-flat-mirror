@@ -748,7 +748,7 @@ impl CartContext {
             self.peek(Ram::MAP_OFFSET + y as usize * Ram::MAP_W + x as usize)
                 .into()
         } else {
-            -1
+            0
         }
     }
     pub fn mset(&mut self, x: i32, y: i32, tile_id: u8) {
@@ -775,9 +775,9 @@ impl CartContext {
         for i in 0..h {
             for j in 0..w {
                 self.spr(
-                    self.mget(sx + j, sy + i),
-                    x + j * Ram::TILE_W as i32 * scale,
-                    y + i * Ram::TILE_H as i32 * scale,
+                    self.mget(x + j, y + i),
+                    sx + j * Ram::TILE_W as i32 * scale,
+                    sy + i * Ram::TILE_H as i32 * scale,
                     trans_color,
                     scale,
                     0,
@@ -802,11 +802,11 @@ impl CartContext {
     ) {
         for i in 0..h {
             for j in 0..w {
-                let (id, flip, rotate) = remap(self.mget(sx + j, sy + i), sx + j, sy + i);
+                let (id, flip, rotate) = remap(self.mget(x + j, y + i), x + j, y + i);
                 self.spr(
                     id,
-                    x + j * Ram::TILE_W as i32 * scale,
-                    y + i * Ram::TILE_H as i32 * scale,
+                    sx + j * Ram::TILE_W as i32 * scale,
+                    sy + i * Ram::TILE_H as i32 * scale,
                     trans_color,
                     scale,
                     flip,
@@ -869,6 +869,29 @@ impl CartContext {
         }
     }
     fn get_map_pix(&self, x: i32, y: i32) -> u8 {
+        const XMOD: i32 = (Ram::TILE_W * Ram::MAP_W) as i32;
+        const YMOD: i32 = (Ram::TILE_H * Ram::MAP_H) as i32;
+        let x = ((x % XMOD + XMOD) % XMOD) as usize;
+        let y = ((y % YMOD + YMOD) % YMOD) as usize;
+        self.peek4(
+            Ram::TILES_OFFSET * 2
+                + self.peek(
+                    Ram::MAP_OFFSET
+                        + ((y % (Ram::TILE_H * Ram::MAP_H) + (Ram::TILE_H * Ram::MAP_H))
+                            % (Ram::TILE_H * Ram::MAP_H))
+                            / Ram::TILE_H
+                            * Ram::MAP_W
+                        + (((x) % (Ram::MAP_W * Ram::TILE_W) + (Ram::MAP_W * Ram::TILE_W))
+                            % (Ram::MAP_W * Ram::TILE_W))
+                            / Ram::TILE_W,
+                ) as usize
+                    * Ram::TILE_BYTE_SIZE
+                    * 2
+                + (((y) % Ram::TILE_H + Ram::TILE_H) % Ram::TILE_H) * Ram::TILE_W
+                + (((x) % Ram::TILE_W + Ram::TILE_W) % Ram::TILE_W),
+        )
+    }
+    /*fn get_map_pix(&self, x: i32, y: i32) -> u8 {
         if x >= 0
             && y >= 0
             && x < (Ram::MAP_W * Ram::TILE_W) as i32
@@ -896,7 +919,7 @@ impl CartContext {
         } else {
             255
         }
-    }
+    }*/
     pub fn textri(
         &mut self,
         x1: f32,
@@ -1262,6 +1285,66 @@ impl CartContext {
         }
     }
 
+    pub fn load_all(&mut self) {
+        for chunk in self.file_data.borrow().chunks.iter() {
+            if chunk.bank == 0 {
+                let data = &chunk.data;
+                match chunk.chunk_type {
+                    ChunkType::Tiles => {
+                        for i in 0..data.len().min(Ram::TILES_BYTE_SIZE) {
+                            self.ram[Ram::TILES_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Sprites => {
+                        for i in 0..data.len().min(Ram::SPRITES_BYTE_SIZE) {
+                            self.ram[Ram::SPRITES_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Map => {
+                        for i in 0..data.len().min(Ram::MAP_BYTE_SIZE) {
+                            self.ram[Ram::MAP_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Flags => {
+                        for i in 0..data.len().min(Ram::SPRITE_FLAGS_BYTE_SIZE) {
+                            self.ram[Ram::SPRITE_FLAGS_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Sfx => {
+                        for i in 0..data.len().min(Ram::SFX_BYTE_SIZE_TOTAL) {
+                            self.ram[Ram::SFX_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Waveforms => {
+                        for i in 0..data.len().min(Ram::WAVEFORMS_BYTE_SIZE) {
+                            self.ram[Ram::WAVEFORMS_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Palette => {
+                        self.ram.set_active_vbank(1);
+                        for i in 0..data.len().min(Vram::PALETTE_BYTE_SIZE) {
+                            self.ram[Vram::PALETTE_OFFSET + i] = data[i];
+                        }
+                        self.ram.set_active_vbank(0);
+                        for i in 0..data.len().min(Vram::PALETTE_BYTE_SIZE) {
+                            self.ram[Vram::PALETTE_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Music => {
+                        for i in 0..data.len().min(Ram::MUSIC_TRACKS_BYTE_SIZE) {
+                            self.ram[Ram::MUSIC_TRACKS_OFFSET + i] = data[i];
+                        }
+                    }
+                    ChunkType::Patterns => {
+                        for i in 0..data.len().min(Ram::MUSIC_PATTERNS_BYTE_SIZE) {
+                            self.ram[Ram::MUSIC_PATTERNS_OFFSET + i] = data[i];
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
     fn load_from_cart(&mut self, mask: u8, bank: u8) {
         if (mask & 1) != 0 {
             if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Tiles, bank) {
@@ -1286,7 +1369,7 @@ impl CartContext {
         }
         if (mask & 8) != 0 {
             if let Some(data) = self.file_data.borrow().get_chunk(ChunkType::Sfx, bank) {
-                for i in 0..data.data.len().min(Ram::SFX_BYTE_SIZE) {
+                for i in 0..data.data.len().min(Ram::SFX_BYTE_SIZE_TOTAL) {
                     self.ram[Ram::SFX_OFFSET + i] = data.data[i];
                 }
             }
@@ -1351,7 +1434,7 @@ impl CartContext {
                 .set_chunk(ChunkType::Map, bank, data);
         }
         if (mask & 8) != 0 {
-            let data = (0..Ram::SFX_BYTE_SIZE)
+            let data = (0..Ram::SFX_BYTE_SIZE_TOTAL)
                 .map(|i| self.ram[Ram::SFX_OFFSET + i])
                 .collect();
             self.file_data
