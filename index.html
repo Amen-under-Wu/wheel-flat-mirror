@@ -66,14 +66,25 @@
             DynamicWaveformPlayer.appendWaveform(waveform);
         }
         window.onload = function() {
-            document.getElementById('cover-title').innerText = '点击开始';
+            let cover_title = document.getElementById('cover-title');
+            cover_title.innerText = '点击开始';
             let cover = document.getElementById('cover');
             cover.style.cursor = 'pointer';
             cover.onclick = async function() {
+                cover_title.innerText = '请稍候……';
                 await init_player();
+                while (!try_init()) {}
                 let cover = document.getElementById('cover');
                 cover.style.display = 'none';
+            }
+        }
+        function try_init() {
+            try {
                 buttonCallback();
+                return true;
+            }
+            catch (err) {
+                return false;
             }
         }
     </script>
