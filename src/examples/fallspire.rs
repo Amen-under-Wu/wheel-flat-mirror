@@ -34,7 +34,7 @@ fn smootherstep(x: Float) -> Float {
 
 fn easeout(x: Float, q: Option<Float>) -> Float {
     let q = q.unwrap_or(100.0);
-    if x <= 1.570796 * q {
+    if x <= -1.570796 * q {
         -x - 0.570796 * q
     } else {
         if x >= 0.0 {
@@ -1124,7 +1124,7 @@ impl FallSpireScene for ScenePond {
             0,
             yy as i32,
             240,
-            (-yy - camera_y - 2.0) as i32,
+            (-yy - camera_y - 2.0).round() as i32,
             2,
         );
         self.core.borrow().gcore.tree1(8, -136 - camera_y as i32);
@@ -1240,6 +1240,15 @@ impl FallSpireScene for SceneForest {
         }
         core.palette_index(&[]);
         self.t += 1;
+        self.core.borrow().cart.borrow_mut().print(
+            format!("{}", self.t / 60).as_str(),
+            0,
+            0,
+            15,
+            true,
+            1,
+            true,
+        );
     }
     fn overlay(&mut self) {
         if self.t < self.title_vanish_time - 5 {
@@ -1925,7 +1934,7 @@ impl FallSpireScene for SceneTowerCollapse {
             let cc = -angle.cos();
             let ss = -angle.sin();
             let x1 = (towerx - ss * h) as f32;
-            let y1 = (towery - cc * h) as f32;
+            let y1 = (towery + cc * h) as f32;
             let x2 = (towerx + cc * 8.0 - ss * h) as f32;
             let y2 = (towery + ss * 8.0 + cc * h) as f32;
             let x3 = towerx as f32;
