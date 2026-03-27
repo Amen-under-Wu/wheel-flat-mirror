@@ -222,6 +222,9 @@ impl PlayRegister for Speaker {
             }
             self.phases[i] = (self.phases[i] + ((freq as f32 / 60.0) % 1.0)) % 1.0;
         }
+        for i in self.buffer.iter_mut() {
+            *i *= 0.25;
+        }
         self.worklet_call
             .call1(
                 &JsValue::NULL,

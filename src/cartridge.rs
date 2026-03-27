@@ -1217,6 +1217,7 @@ impl CartContext {
         5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902,
     ];
     pub fn update_sound(&mut self) {
+        self.memset(Ram::SOUND_REGISTERS_OFFSET, 0, Ram::SOUND_REGISTER_SIZE * 4);
         for i in 0..4 {
             let reg = &mut self.sfx_reg[i];
             let sfx_state_offset = Ram::SFX_STATE_OFFSET + i * 4;
@@ -1229,7 +1230,7 @@ impl CartContext {
                 }
                 continue;
             }
-            let sr_offset = Ram::SOUND_REGISTERS_OFFSET + i * 18;
+            let sr_offset = Ram::SOUND_REGISTERS_OFFSET + i * Ram::SOUND_REGISTER_SIZE;
             let sfx_offset = Ram::SFX_OFFSET + reg.id as usize * Ram::SFX_BYTE_SIZE;
 
             let waveform_frame = self.peek(sfx_state_offset + 1) as usize;
@@ -1243,8 +1244,11 @@ impl CartContext {
             );
             let reg = self.sfx_reg[i].clone();
             let vol_frame = self.peek(sfx_state_offset) as usize;
-            let frame_vol = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * vol_frame) & 0xf;
-            let volume = (frame_vol + reg.volume).saturating_sub(15).max(1);
+            // doc says volume is inverted
+            let frame_vol = 15 - self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * vol_frame) & 0xf;
+            let volume = reg.volume.min(1)
+                * frame_vol.min(1)
+                * (frame_vol + reg.volume).saturating_sub(15).max(1);
 
             let arp_frame = self.peek(sfx_state_offset + 2) as usize;
             let arp = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * arp_frame + 1) & 0xf;

@@ -16,7 +16,7 @@ impl SystemContext {
         Self {
             lines: vec![
                 ("拓竹杯初审未过审作品 wheel flat 轮扁".to_string(), 4),
-                ("输入 run 进入演示,按esc回到终端".to_string(), 5),
+                ("使用方法请自行阅读源码以探索 :P".to_string(), 5),
             ],
             input_buffer: String::new(),
             cursor_pos: 0,

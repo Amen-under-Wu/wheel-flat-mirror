@@ -18,6 +18,7 @@ enum Command {
     Upload(String),
     Unknown,
     Fallspire,
+    Debug,
 }
 
 fn parse_command(input: &str) -> Command {
@@ -31,6 +32,7 @@ fn parse_command(input: &str) -> Command {
         Some("save") => Command::Save,
         Some("upload") if parts.len() > 1 => Command::Upload(parts[1].to_string()),
         Some("fallspire") => Command::Fallspire,
+        Some("debug") => Command::Debug,
         _ => Command::Unknown,
     }
 }
@@ -106,6 +108,12 @@ impl WheelWrapper {
                 script.init(self.cart.clone(), self.system.clone());
                 self.state = WrapperState::Running(Box::new(script));
             }
+            Command::Debug => {
+                self.system.borrow_mut().program_timer = Date::now() as u64;
+                let mut script = crate::examples::test::TestCart::new();
+                script.init(self.cart.clone(), self.system.clone());
+                self.state = WrapperState::Running(Box::new(script));
+            }
             Command::Unknown => {
                 self.system.borrow_mut().trace("未知命令", 13);
             }
@@ -151,6 +159,9 @@ impl WheelWrapper {
                 }
                 self.file_in_buffer = None;
             }
+        }
+        for i in 0..4 {
+            self.cart.borrow_mut().sfx(255, 0, -1, i, 0, 0);
         }
         self.cart.borrow_mut().cls(0);
         for i in self.system.borrow().top_line..self.system.borrow().lines.len() {
@@ -451,6 +462,12 @@ impl crate::WheelProgram for WheelWrapper {
         // draw screen
         self.cart.borrow_mut().ram.set_active_vbank(0);
         self.self_update();
+        self.cart.borrow_mut().ram.set_active_vbank(1);
+        self.cart.borrow_mut().ram.clear_overlay();
+        if let WrapperState::Running(prog) = &mut self.state {
+            prog.overlay();
+        }
+        self.cart.borrow_mut().ram.set_active_vbank(0);
         for i in 0..Self::BORDER_H {
             if let WrapperState::Running(prog) = &mut self.state {
                 prog.scanline(i);
@@ -505,10 +522,6 @@ impl crate::WheelProgram for WheelWrapper {
         }
 
         self.cart.borrow_mut().ram.set_active_vbank(1);
-        self.cart.borrow_mut().ram.clear_overlay();
-        if let WrapperState::Running(prog) = &mut self.state {
-            prog.overlay();
-        }
         let palette: Vec<u32> = (0..16).into_iter().map(|c| self.get_color(c)).collect();
         let trans_color = self.cart.borrow().peek(Vram::BORDER_COLOR_OFFSET) & 0xf;
         let x_offset: i32 = (self.cart.borrow().peek(Vram::SCREEN_OFFSET_OFFSET) as i8).into();
@@ -553,8 +566,6 @@ impl crate::WheelProgram for WheelWrapper {
                 waveform[j] = self.cart.borrow().peek4((offset + 2) * 2 + j);
             }
             wheel.play(i, waveform, vol, freq);
-
-            // update the registers with sfx things, here just clearing it
         }
         self.cart.borrow_mut().update_sound();
 

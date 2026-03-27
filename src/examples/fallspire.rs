@@ -36,10 +36,12 @@ fn easeout(x: Float, q: Option<Float>) -> Float {
     let q = q.unwrap_or(100.0);
     if x <= 1.570796 * q {
         -x - 0.570796 * q
-    } else if x >= 0.0 {
-        0.0
     } else {
-        -q * ((x / q).cos() - 1.0)
+        if x >= 0.0 {
+            0.0
+        } else {
+            -q * ((x / q).cos() - 1.0)
+        }
     }
 }
 
@@ -509,7 +511,7 @@ impl FallSpireCore {
         let context = &mut self.acore.context;
         let rng = &mut self.rng;
         let voice = &mut self.acore.voices[idx];
-        const PI: Float = std::f64::consts::PI;
+        const PI: Float = std::f64::consts::PI as Float;
         voice.volume *= 1.0 - voice.decay;
         let mut w = [0.0; 32];
         voice.filter.update(0.5, 1.0);
@@ -693,9 +695,10 @@ impl GraphicsCore {
     }
     fn fade(&self, amt: i32) {
         for i in 3..48 {
-            self.cart
-                .borrow_mut()
-                .poke(0x3fc0 + i, (self.palette[i] as i32 + amt).min(255) as u8);
+            self.cart.borrow_mut().poke(
+                0x3fc0 + i,
+                (self.palette[i] as i32 + amt).min(255).max(0) as u8,
+            );
         }
     }
     fn scanline_offset(&self, amt: u8) {
@@ -703,7 +706,7 @@ impl GraphicsCore {
     }
     fn palette_index(&self, inds: &[u8]) {
         for i in 0..inds.len() {
-            self.cart.borrow_mut().poke4(0x3ff0 * 2 + i + 1, inds[i]);
+            self.cart.borrow_mut().poke4(0x3ff0 * 2 + i, inds[i]);
         }
         for i in inds.len()..16 {
             self.cart.borrow_mut().poke4(0x3ff0 * 2 + i, i as u8);
@@ -893,7 +896,7 @@ impl GraphicsCore {
     fn bgtree2(&self, x: i32, y: i32) {
         self.cart.borrow_mut().map(14, 23, 12, 11, x, y, 6, 1);
     }
-    fn title(&self, x: Option<i32>, y: Option<i32>, index: Option<usize>) {
+    fn title(&self, x: Option<i32>, y: Option<i32>, index: Option<i32>) {
         let x = x.unwrap_or(0);
         let y = y.unwrap_or(0);
         let index = index.unwrap_or(10);
@@ -909,7 +912,7 @@ impl GraphicsCore {
             [10, 7],
             [9, 12],
         ];
-        let index = index.min(9);
+        let index = index.clamp(1, 10) as usize - 1;
         self.palette_index(&PALETTES[index]);
         self.cart
             .borrow_mut()
@@ -1109,10 +1112,11 @@ impl FallSpireScene for ScenePond {
     fn overlay(&mut self) {
         let camera_y = self.core.borrow().gcore.camera.y;
         let yy = -camera_y * 0.6 - self.ytilt * 150.0;
-        self.core
-            .borrow()
-            .gcore
-            .terrain1(0, yy as i32, Some((-yy - camera_y) as i32 / 8 - 1));
+        self.core.borrow().gcore.terrain1(
+            0,
+            yy.round() as i32,
+            Some((-yy - camera_y) as i32 / 8 - 1),
+        );
         let yy = -camera_y * 0.8 - self.ytilt * 50.0;
         self.core.borrow().gcore.bgtree1(0, -80 + yy as i32);
         self.core.borrow().gcore.bgtree2(14 * 8, -88 + yy as i32);
@@ -1147,12 +1151,12 @@ impl FallSpireScene for ScenePond {
             );
         }
         if self.t > self.title_time {
-            self.core.borrow().gcore.title(
-                Some(0),
-                Some(0),
-                Some((self.t - self.title_time) as usize / 5),
-            );
+            self.core
+                .borrow()
+                .gcore
+                .title(Some(0), Some(0), Some((self.t - self.title_time) / 5));
         }
+        //self.core.borrow().cart.borrow_mut().print(format!("{}", yy).as_str(), 0,0,15,true,1,true);
     }
 }
 
@@ -1174,15 +1178,14 @@ impl SceneForest {
 }
 impl FallSpireScene for SceneForest {
     fn update(&mut self) {
-        self.core.borrow().cart.borrow_mut().cls(6);
-        self.core.borrow_mut().gcore.camera.x =
-            400.0 - 3.0 * easeout((self.t - self.pan_duration) as Float, Some(200.0));
-        self.core.borrow_mut().gcore.camera.y = -easeout((self.t - 400) as Float, Some(200.0));
-        let core = &self.core.borrow().gcore;
-        let camera_x = core.camera.x;
-        let camera_y = core.camera.y;
+        let camera_x = 400.0 - 3.0 * easeout((self.t - self.pan_duration) as Float, Some(200.0));
+        let camera_y = -easeout((self.t - 400) as Float, Some(200.0));
         let xi = camera_x as i32;
         let yi = camera_y as i32;
+        self.core.borrow().cart.borrow_mut().cls(6);
+        self.core.borrow_mut().gcore.camera.x = camera_x;
+        self.core.borrow_mut().gcore.camera.y = camera_y;
+        let core = &self.core.borrow().gcore;
         core.palette_index(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 7, 7, 13, 14, 7]);
         core.cart
             .borrow_mut()
@@ -1198,10 +1201,10 @@ impl FallSpireScene for SceneForest {
         core.palette_index(&[1, 2, 4, 4, 11]);
         core.terrain1(-xi / 4 + 100, 80 - yi / 4, None);
         core.palette_index(&[1, 2, 3, 4, 4]);
-        core.terrain1(-xi / 2, 92 - yi / 2, None);
+        core.terrain1(-xi / 2, 95 - yi / 2, None);
         core.palette_index(&[]);
-        let xp = -(2.0 * camera_x / 3.0) as i32;
-        let yp = -(2.0 * camera_y / 3.0) as i32;
+        let xp = -(2.0 * camera_x) as i32 / 3;
+        let yp = -(2.0 * camera_y) as i32 / 3;
         if camera_x < 0.0 {
             core.bgtree1(xp % 360 - 120, 56 + yp);
             core.bgtree2((xp + 100) % 360 - 120, 44 + yp);
@@ -1213,8 +1216,8 @@ impl FallSpireScene for SceneForest {
         }
         core.cart.borrow_mut().spr(
             257 + ((self.t / 15) % 3) * 3,
-            600 - xi,
-            120 - 24 - yi,
+            (600.0 - camera_x) as i32,
+            (120.0 - 24.0 - camera_y) as i32,
             6,
             1,
             0,
@@ -1222,7 +1225,7 @@ impl FallSpireScene for SceneForest {
             3,
             3,
         );
-        core.terrain2(-xi, 120 - yi, None);
+        core.terrain2(-xi, (120.0 - camera_y) as i32, None);
         core.palette_index(&[1, 1]);
         let xp = -xi;
         let yp = -yi;
@@ -1238,13 +1241,12 @@ impl FallSpireScene for SceneForest {
         core.palette_index(&[]);
         self.t += 1;
     }
-    fn scanline(&mut self, _row: i32) {}
     fn overlay(&mut self) {
         if self.t < self.title_vanish_time - 5 {
             self.core.borrow().gcore.title(
                 Some(0),
                 Some(0),
-                Some((self.title_vanish_time - self.t) as usize / 5),
+                Some((self.title_vanish_time - self.t) / 5),
             );
         }
     }
@@ -1425,7 +1427,7 @@ impl FallSpireScene for SceneTowerBase {
         core.terrain1(-cx as i32 / 2, 30 - cy as i32 / 2, None);
         core.cart
             .borrow_mut()
-            .rect(0, 64 + (-3 * cy as i32 / 4), 240, 80, 11);
+            .rect(0, 64 + (-3 * (cy as i32 / 4)), 240, 80, 11);
         {
             let mut cart = core.cart.borrow_mut();
             if cy > -68.0 {
@@ -2183,7 +2185,7 @@ impl InternalProgram for FallSpire {
         let data = crate::wheel_file::WheelFile::from_bytes(include_bytes!("fallspire.tic"))
             .expect("failed to load fallspire.tic");
         cart.borrow_mut().file_data = Rc::new(RefCell::new(data));
-        cart.borrow_mut().sync(0, 0, false);
+        cart.borrow_mut().load_all();
         let core = Rc::new(RefCell::new(FallSpireCore::new(cart, system)));
         self.scenes = vec![
             Box::new(ScenePond::new(core.clone())),
@@ -2201,6 +2203,9 @@ impl InternalProgram for FallSpire {
     fn update(&mut self) {
         {
             let core = &mut self.core.as_ref().unwrap().borrow_mut();
+            if core.cart.borrow().keyp(Some(66)) {
+                core.system.borrow_mut().exit();
+            }
             core.update_music();
             if core.acore.context.fin {
                 core.fade_amt -= 0.5;
@@ -2222,6 +2227,7 @@ impl InternalProgram for FallSpire {
         }
         let n = self.core.as_ref().unwrap().borrow().scene_number;
         self.scenes[n].update();
+        //self.core.as_ref().unwrap().borrow().cart.borrow_mut().map(60, 34, 30, 17, 0, 0, 6, 1);
     }
     fn scanline(&mut self, i: usize) {
         let n = self.core.as_ref().unwrap().borrow().scene_number;
