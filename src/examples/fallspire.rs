@@ -708,7 +708,7 @@ impl GraphicsCore {
         for i in 0..inds.len() {
             self.cart.borrow_mut().poke4(0x3ff0 * 2 + i + 1, inds[i]);
         }
-        for i in inds.len()+1..16 {
+        for i in inds.len() + 1..16 {
             self.cart.borrow_mut().poke4(0x3ff0 * 2 + i, i as u8);
         }
     }
@@ -876,9 +876,14 @@ impl GraphicsCore {
     }
     fn tower_repeat(&self, x: i32, y: i32) {
         let mut cart = self.cart.borrow_mut();
-        for i in (64..=64 - y).step_by(64) {
-            cart.map(58, 0, 1, 8, x, -i, 255, 1);
+        let mut i = y - 64;
+        while i >= -64 {
+            cart.map(58, 0, 1, 8, x, i, 255, 1);
+            i -= 64;
         }
+        /*for i in (64..=64 - y).step_by(64) {
+            cart.map(58, 0, 1, 8, x, -i, 255, 1);
+        }*/
     }
     fn cloud_repeat(&self, x: i32, y: i32) {
         let mut cart = self.cart.borrow_mut();
@@ -925,16 +930,34 @@ impl GraphicsCore {
     fn terrain1(&self, x: i32, y: i32, h: Option<i32>) {
         let mut cart = self.cart.borrow_mut();
         let h = h.unwrap_or(8);
-        let xmod = x % 240;
+        let xmod = (x % 240 + 240) % 240;
         cart.map(60, 0, 30 - xmod / 8, h, xmod, y, 6, 1);
-        cart.map(60 + 29 - xmod / 8, 0, xmod / 8 + 1, h, x % 8 - 8, y, 6, 1);
+        cart.map(
+            60 + 29 - xmod / 8,
+            0,
+            xmod / 8 + 1,
+            h,
+            (x % 8 + 8) % 8 - 8,
+            y,
+            6,
+            1,
+        );
     }
     fn terrain2(&self, x: i32, y: i32, h: Option<i32>) {
         let mut cart = self.cart.borrow_mut();
         let h = h.unwrap_or(9);
-        let xmod = x % 240;
+        let xmod = (x % 240 + 240) % 240;
         cart.map(60, 8, 30 - xmod / 8, h, xmod, y, 6, 1);
-        cart.map(60 + 29 - xmod / 8, 8, xmod / 8 + 1, h, x % 8 - 8, y, 6, 1);
+        cart.map(
+            60 + 29 - xmod / 8,
+            8,
+            xmod / 8 + 1,
+            h,
+            (x % 8 + 8) % 8 - 8,
+            y,
+            6,
+            1,
+        );
     }
 }
 
@@ -1182,8 +1205,8 @@ impl FallSpireScene for SceneForest {
     fn update(&mut self) {
         let camera_x = 400.0 - 3.0 * easeout((self.t - self.pan_duration) as Float, Some(200.0));
         let camera_y = -easeout((self.t - 400) as Float, Some(200.0));
-        let xi = camera_x as i32;
-        let yi = camera_y as i32;
+        let xi = camera_x.floor() as i32;
+        let yi = camera_y.floor() as i32;
         self.core.borrow().cart.borrow_mut().cls(6);
         self.core.borrow_mut().gcore.camera.x = camera_x;
         self.core.borrow_mut().gcore.camera.y = camera_y;
@@ -1196,14 +1219,32 @@ impl FallSpireScene for SceneForest {
         core.cart
             .borrow_mut()
             .map(0, 34, 20, 12, 120 - xi / 7 - self.t / 10, 30 - yi / 7, 6, 1);
-        core.tower_repeat(120 - xi / 6, 120 - yi / 6);
-        core.cart
-            .borrow_mut()
-            .map(21, 35, 26, 12, -xi / 6 + self.t / 8, 35 - yi / 6, 6, 1);
+        core.tower_repeat(
+            120 - (camera_x / 6.0).floor() as i32,
+            120 - (camera_y / 6.0).floor() as i32,
+        );
+        core.cart.borrow_mut().map(
+            21,
+            35,
+            26,
+            12,
+            (-camera_x / 6.0).floor() as i32 + self.t / 8,
+            35 - (camera_y / 6.0).floor() as i32,
+            6,
+            1,
+        );
         core.palette_index(&[1, 2, 4, 4, 11]);
-        core.terrain1(-xi / 4 + 100, 80 - yi / 4, None);
+        core.terrain1(
+            (-camera_x / 4.0).floor() as i32 + 100,
+            80 - (camera_y / 4.0).floor() as i32,
+            None,
+        );
         core.palette_index(&[1, 2, 3, 4, 4]);
-        core.terrain1(-xi / 2, 95 - yi / 2, None);
+        core.terrain1(
+            (-camera_x / 2.0).floor() as i32,
+            95 - (camera_y / 2.0).floor() as i32,
+            None,
+        );
         core.palette_index(&[]);
         let xp = -(2.0 * camera_x) as i32 / 3;
         let yp = -(2.0 * camera_y) as i32 / 3;
@@ -1529,7 +1570,8 @@ impl FallSpireScene for SceneTower {
             let tx = 120.0 * 8.0 + (240.0 + rad as Float * as_ + ang) % 240.0;
             let ty = 136 - (self.t % 136);
             core.palette_index(
-                &Self::PALETTE_INDEXES[((1.0 + (self.t % 2) as Float * flicker + 5.0 * as_).floor() as i32
+                &Self::PALETTE_INDEXES[((1.0 + (self.t % 2) as Float * flicker + 5.0 * as_).floor()
+                    as i32
                     + 6) as usize
                     % Self::PALETTE_INDEXES.len()],
             );

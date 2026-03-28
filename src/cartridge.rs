@@ -143,6 +143,9 @@ impl CartContext {
 
     // graphics
 
+    fn map_color(&self, color: u8) -> u8 {
+        self.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize)
+    }
     fn in_clip(&self, x: i32, y: i32) -> bool {
         x >= self.clip_rect.0
             && x < self.clip_rect.0 + self.clip_rect.2
@@ -169,7 +172,14 @@ impl CartContext {
         }
     }
 
+    pub fn set_pix_direct(&mut self, x: i32, y: i32, color: u8) {
+        if self.in_clip(x, y) && color < 16 {
+            self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
+            self.get_subpix_map_mut().del(x as usize, y as usize);
+        }
+    }
     pub fn set_pix(&mut self, x: i32, y: i32, color: u8) {
+        let color = self.map_color(color);
         if self.in_clip(x, y) && color < 16 {
             self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
             self.get_subpix_map_mut().del(x as usize, y as usize);
@@ -183,6 +193,7 @@ impl CartContext {
         }
     }
     pub fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u8) {
+        let color = self.map_color(color);
         /*let w = w.min(self.clip_rect.0 + self.clip_rect.2 - x);
         let h = h.min(self.clip_rect.1 + self.clip_rect.3 - y);
         let x = x.max(self.clip_rect.0);
@@ -192,11 +203,12 @@ impl CartContext {
                 /*self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
                 self.get_subpix_map_mut().del(xx as usize, yy as usize);*/
                 // screw the performance
-                self.set_pix(xx,yy,color);
+                self.set_pix_direct(xx, yy, color);
             }
         }
     }
     pub fn rectb(&mut self, x: i32, y: i32, w: i32, h: i32, color: u8) {
+        let color = self.map_color(color);
         let x_start = x.max(self.clip_rect.0);
         let y_start = y.max(self.clip_rect.1);
         self.draw_while(x_start, x + w, color, &(|x| (x, y)));
@@ -213,6 +225,7 @@ impl CartContext {
         self.draw_while(y_start, y + h, color, &(|y| (x, y)));
     }
     pub fn line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, color: u8) {
+        let color = self.map_color(color);
         let (x1, x2, y1, y2) = if x1 > x2 {
             (x2, x1, y2, y1)
         } else {
@@ -226,7 +239,7 @@ impl CartContext {
             yi = y1.ceil();
             if -dy > dx {
                 while yi >= y2 {
-                    self.set_pix(xi as i32, yi as i32, color);
+                    self.set_pix_direct(xi as i32, yi as i32, color);
                     yi -= 1.0;
                     if -(dx * yi - dy * xi - dx * y1 + dy * x1)
                         > dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1
@@ -236,7 +249,7 @@ impl CartContext {
                 }
             } else {
                 while xi <= x2 {
-                    self.set_pix(xi as i32, yi as i32, color);
+                    self.set_pix_direct(xi as i32, yi as i32, color);
                     xi += 1.0;
                     if dx * yi - dy * xi - dx * y1 + dy * x1
                         > -(dx * (yi - 1.0) - dy * xi - dx * y1 + dy * x1)
@@ -249,7 +262,7 @@ impl CartContext {
             yi = y1.floor();
             if dy > dx {
                 while yi <= y2 {
-                    self.set_pix(xi as i32, yi as i32, color);
+                    self.set_pix_direct(xi as i32, yi as i32, color);
                     yi += 1.0;
                     if dx * yi - dy * xi - dx * y1 + dy * x1
                         > -(dx * yi - dy * (xi + 1.0) - dx * y1 + dy * x1)
@@ -259,7 +272,7 @@ impl CartContext {
                 }
             } else {
                 while xi <= x2 {
-                    self.set_pix(xi as i32, yi as i32, color);
+                    self.set_pix_direct(xi as i32, yi as i32, color);
                     xi += 1.0;
                     if -(dx * yi - dy * xi - dx * y1 + dy * x1)
                         > dx * (yi + 1.0) - dy * xi - dx * y1 + dy * x1
@@ -271,6 +284,7 @@ impl CartContext {
         }
     }
     pub fn circ(&mut self, x: i32, y: i32, r: i32, color: u8) {
+        let color = self.map_color(color);
         if r > 0 {
             self.hline(x - r, y, r * 2 + 1, color);
             self.vline(x, y - r, r * 2 + 1, color);
@@ -289,11 +303,12 @@ impl CartContext {
         }
     }
     pub fn circb(&mut self, x: i32, y: i32, r: i32, color: u8) {
+        let color = self.map_color(color);
         if r > 0 {
-            self.set_pix(x + r, y, color);
-            self.set_pix(x - r, y, color);
-            self.set_pix(x, y + r, color);
-            self.set_pix(x, y - r, color);
+            self.set_pix_direct(x + r, y, color);
+            self.set_pix_direct(x - r, y, color);
+            self.set_pix_direct(x, y + r, color);
+            self.set_pix_direct(x, y - r, color);
             let mut rx: i32 = r;
             let mut ry: i32 = 0;
             while rx > ry + 1 {
@@ -301,14 +316,14 @@ impl CartContext {
                 if rx * rx + ry * ry - r * r > -((rx - 1) * (rx - 1) + ry * ry - r * r) {
                     rx -= 1;
                 }
-                self.set_pix(x + rx, y + ry, color);
-                self.set_pix(x + rx, y - ry, color);
-                self.set_pix(x - rx, y + ry, color);
-                self.set_pix(x - rx, y - ry, color);
-                self.set_pix(x + ry, y + rx, color);
-                self.set_pix(x + ry, y - rx, color);
-                self.set_pix(x - ry, y + rx, color);
-                self.set_pix(x - ry, y - rx, color);
+                self.set_pix_direct(x + rx, y + ry, color);
+                self.set_pix_direct(x + rx, y - ry, color);
+                self.set_pix_direct(x - rx, y + ry, color);
+                self.set_pix_direct(x - rx, y - ry, color);
+                self.set_pix_direct(x + ry, y + rx, color);
+                self.set_pix_direct(x + ry, y - rx, color);
+                self.set_pix_direct(x - ry, y + rx, color);
+                self.set_pix_direct(x - ry, y - rx, color);
             }
         }
     }
@@ -316,6 +331,7 @@ impl CartContext {
         (rx * rx * b * b + ry * ry * a * a - a * a * b * b).abs()
     }
     pub fn elli(&mut self, x: i32, y: i32, a: i32, b: i32, color: u8) {
+        let color = self.map_color(color);
         if a > 0 && b > 0 && color < 16 {
             let mut rx = a;
             let mut ry = 0;
@@ -336,14 +352,15 @@ impl CartContext {
         }
     }
     pub fn ellib(&mut self, x: i32, y: i32, a: i32, b: i32, color: u8) {
+        let color = self.map_color(color);
         if a > 0 && b > 0 && color < 16 {
             let mut rx = a;
             let mut ry = 0;
             while ry < b {
-                self.set_pix(x + rx, y + ry, color);
-                self.set_pix(x + rx, y - ry, color);
-                self.set_pix(x - rx, y + ry, color);
-                self.set_pix(x - rx, y - ry, color);
+                self.set_pix_direct(x + rx, y + ry, color);
+                self.set_pix_direct(x + rx, y - ry, color);
+                self.set_pix_direct(x - rx, y + ry, color);
+                self.set_pix_direct(x - rx, y - ry, color);
                 if Self::elli_d(rx - 1, ry + 1, a, b) < Self::elli_d(rx, ry + 1, a, b) {
                     rx -= 1;
                     if Self::elli_d(rx - 1, ry + 1, a, b) < Self::elli_d(rx - 1, ry, a, b) {
@@ -358,6 +375,7 @@ impl CartContext {
         }
     }
     pub fn cls(&mut self, color: u8) {
+        let color = self.map_color(color);
         for y in self.clip_rect.1..self.clip_rect.1 + self.clip_rect.3 {
             for x in self.clip_rect.0..self.clip_rect.0 + self.clip_rect.2 {
                 self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
@@ -839,7 +857,7 @@ impl CartContext {
                 if (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0)
                     || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0)
                 {
-                    self.set_pix(x, y, color);
+                    self.set_pix_direct(x, y, color);
                 }
             }
         }
@@ -939,6 +957,7 @@ impl CartContext {
         use_map: bool,
         trans_color: u8,
     ) {
+        let palette_map: Vec<u8> = (0..16).map(|i| self.map_color(i)).collect();
         let x_max = (x1.ceil().max(x2.ceil()).max(x3.ceil()) as i32)
             .min(self.clip_rect.0 + self.clip_rect.2 - 1);
         let x_min = (x1.floor().min(x2.floor()).min(x3.floor()) as i32).max(self.clip_rect.0);
@@ -970,9 +989,9 @@ impl CartContext {
                     {
                         let u = (a * x + b * y + c).round() as i32;
                         let v = (d * x + e * y + f).round() as i32;
-                        let color = self.get_map_pix(u, v);
+                        let color = palette_map[self.get_map_pix(u, v) as usize];
                         if color != trans_color {
-                            self.set_pix(x as i32, y as i32, color);
+                            self.set_pix_direct(x as i32, y as i32, color);
                         }
                     }
                 }
@@ -990,9 +1009,9 @@ impl CartContext {
                     {
                         let u = (a * x + b * y + c).round() as i32;
                         let v = (d * x + e * y + f).round() as i32;
-                        let color = self.get_tile_pix(u, v);
+                        let color = palette_map[self.get_tile_pix(u, v) as usize];
                         if color != trans_color {
-                            self.set_pix(x as i32, y as i32, color);
+                            self.set_pix_direct(x as i32, y as i32, color);
                         }
                     }
                 }

@@ -213,7 +213,7 @@ impl WheelWrapper {
     }
     fn get_color(&self, color: u8) -> u32 {
         let context = self.cart.borrow();
-        let true_index = context.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize) as usize;
+        let true_index = color as usize;
         let r = context.peek(Vram::PALETTE_OFFSET + true_index * 3) as u32;
         let g = context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 1) as u32;
         let b = context.peek(Vram::PALETTE_OFFSET + true_index * 3 + 2) as u32;

@@ -29,6 +29,8 @@ http-server
 
 ## TODO
 
+帧数又撑不住了，谁再来救一下 (눈‸눈)
+
 - [x] 用Rust调用web api
   - [x] 图像api
   - [x] 音频api (?)
@@ -49,7 +51,6 @@ http-server
   - [ ] 系统函数
     - [x] ...
     - [ ] reset
-    - [x] trace (with color)
 - [ ] 实现系统console
   - [x] 滚动功能
   - [ ] 选中功能
