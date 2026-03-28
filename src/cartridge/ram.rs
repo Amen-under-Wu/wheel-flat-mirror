@@ -118,8 +118,8 @@ impl std::ops::IndexMut<std::ops::RangeTo<usize>> for Vram {
 }
 
 pub struct Ram {
-    vram: Vram,
-    ram: [u8; Self::SIZE - Vram::SIZE],
+    pub vram: Vram,
+    pub ram: [u8; Self::SIZE - Vram::SIZE],
 }
 
 impl Ram {

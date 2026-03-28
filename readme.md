@@ -29,8 +29,6 @@ http-server
 
 ## TODO
 
-帧数又撑不住了，谁再来救一下 (눈‸눈)
-
 - [x] 用Rust调用web api
   - [x] 图像api
   - [x] 音频api (?)

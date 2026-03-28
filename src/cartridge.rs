@@ -61,6 +61,7 @@ impl CartContext {
 
     // memory manipulations
 
+    #[inline]
     pub fn memcpy(&mut self, from: usize, to: usize, length: usize) {
         let buffer: Vec<u8> = (from..from + length)
             .into_iter()
@@ -70,26 +71,33 @@ impl CartContext {
             self.ram[to + i] = buffer[i];
         }
     }
+    #[inline]
     pub fn memset(&mut self, addr: usize, value: u8, length: usize) {
         for i in 0..length {
             self.ram[addr + i] = value;
         }
     }
+    #[inline]
     pub fn peek_with_bits(&self, addr: usize, bits: usize) -> u8 {
         (self.ram[addr * bits / 8] >> (bits * (addr % (8 / bits)))) & ((1u16 << bits) - 1) as u8
     }
+    #[inline]
     pub fn peek(&self, addr: usize) -> u8 {
         self.ram[addr]
     }
+    #[inline]
     pub fn peek4(&self, addr: usize) -> u8 {
         (self.ram[addr / 2] >> (4 * (addr % 2))) & 0xf
     }
+    #[inline]
     pub fn peek2(&self, addr: usize) -> u8 {
         (self.ram[addr / 4] >> (2 * (addr % 4))) & 0b11
     }
+    #[inline]
     pub fn peek1(&self, addr: usize) -> u8 {
         (self.ram[addr / 8] >> (1 * (addr % 8))) & 0b1
     }
+    #[inline]
     pub fn poke_with_bits(&mut self, addr: usize, val: u8, bits: usize) {
         let byte_borrow = &mut self.ram[addr * bits / 8];
         let bit_offset = ((addr % (8 / bits)) * bits) as u8;
@@ -98,15 +106,19 @@ impl CartContext {
         *byte_borrow &= mask;
         *byte_borrow |= val_mask;
     }
+    #[inline]
     pub fn poke(&mut self, addr: usize, val: u8) {
         self.ram[addr] = val;
     }
+    #[inline]
     pub fn poke4(&mut self, addr: usize, val: u8) {
         self.poke_with_bits(addr, val, 4);
     }
+    #[inline]
     pub fn poke2(&mut self, addr: usize, val: u8) {
         self.poke_with_bits(addr, val, 2);
     }
+    #[inline]
     pub fn poke1(&mut self, addr: usize, val: u8) {
         self.poke_with_bits(addr, val, 1);
     }
@@ -143,9 +155,11 @@ impl CartContext {
 
     // graphics
 
+    #[inline]
     fn map_color(&self, color: u8) -> u8 {
-        self.peek4(Vram::PALETTE_MAP_OFFSET * 2 + color as usize)
+        (self.ram.vram[Vram::PALETTE_MAP_OFFSET + color as usize / 2] >> ((color & 1) << 2)) & 0xf
     }
+    #[inline]
     fn in_clip(&self, x: i32, y: i32) -> bool {
         x >= self.clip_rect.0
             && x < self.clip_rect.0 + self.clip_rect.2
@@ -172,6 +186,7 @@ impl CartContext {
         }
     }
 
+    #[inline]
     pub fn set_pix_direct(&mut self, x: i32, y: i32, color: u8) {
         if self.in_clip(x, y) && color < 16 {
             self.poke4(y as usize * Vram::SCREEN_WIDTH + x as usize, color);
