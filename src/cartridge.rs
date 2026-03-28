@@ -183,14 +183,16 @@ impl CartContext {
         }
     }
     pub fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u8) {
-        let x = x.max(self.clip_rect.0);
-        let y = y.max(self.clip_rect.1);
-        let w = w.min(self.clip_rect.0 + self.clip_rect.2 - x);
+        /*let w = w.min(self.clip_rect.0 + self.clip_rect.2 - x);
         let h = h.min(self.clip_rect.1 + self.clip_rect.3 - y);
+        let x = x.max(self.clip_rect.0);
+        let y = y.max(self.clip_rect.1);*/
         for yy in y..y + h {
             for xx in x..x + w {
-                self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
-                self.get_subpix_map_mut().del(xx as usize, yy as usize);
+                /*self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
+                self.get_subpix_map_mut().del(xx as usize, yy as usize);*/
+                // screw the performance
+                self.set_pix(xx,yy,color);
             }
         }
     }

@@ -706,9 +706,9 @@ impl GraphicsCore {
     }
     fn palette_index(&self, inds: &[u8]) {
         for i in 0..inds.len() {
-            self.cart.borrow_mut().poke4(0x3ff0 * 2 + i, inds[i]);
+            self.cart.borrow_mut().poke4(0x3ff0 * 2 + i + 1, inds[i]);
         }
-        for i in inds.len()..16 {
+        for i in inds.len()+1..16 {
             self.cart.borrow_mut().poke4(0x3ff0 * 2 + i, i as u8);
         }
     }
@@ -886,6 +886,9 @@ impl GraphicsCore {
         cart.map(60, 34, 30, 17, x % 240 - 240, y % 136, 6, 1);
         cart.map(60, 34, 30, 17, x % 240, y % 136 - 136, 6, 1);
         cart.map(60, 34, 30, 17, x % 240 - 240, y % 136 - 136, 6, 1);
+        cart.map(60, 34, 30, 17, x % 240 + 240, y % 136, 6, 1);
+        cart.map(60, 34, 30, 17, x % 240, y % 136 + 136, 6, 1);
+        cart.map(60, 34, 30, 17, x % 240 + 240, y % 136 + 136, 6, 1);
     }
     fn tower_top(&self, x: i32, y: i32) {
         self.cart.borrow_mut().map(92, 1, 4, 30, x, y, 6, 1);
@@ -1156,7 +1159,6 @@ impl FallSpireScene for ScenePond {
                 .gcore
                 .title(Some(0), Some(0), Some((self.t - self.title_time) / 5));
         }
-        //self.core.borrow().cart.borrow_mut().print(format!("{}", yy).as_str(), 0,0,15,true,1,true);
     }
 }
 
@@ -1240,15 +1242,6 @@ impl FallSpireScene for SceneForest {
         }
         core.palette_index(&[]);
         self.t += 1;
-        self.core.borrow().cart.borrow_mut().print(
-            format!("{}", self.t / 60).as_str(),
-            0,
-            0,
-            15,
-            true,
-            1,
-            true,
-        );
     }
     fn overlay(&mut self) {
         if self.t < self.title_vanish_time - 5 {
@@ -1536,7 +1529,7 @@ impl FallSpireScene for SceneTower {
             let tx = 120.0 * 8.0 + (240.0 + rad as Float * as_ + ang) % 240.0;
             let ty = 136 - (self.t % 136);
             core.palette_index(
-                &Self::PALETTE_INDEXES[((1.0 + (self.t % 2) as Float * flicker + 5.0 * as_) as i32
+                &Self::PALETTE_INDEXES[((1.0 + (self.t % 2) as Float * flicker + 5.0 * as_).floor() as i32
                     + 6) as usize
                     % Self::PALETTE_INDEXES.len()],
             );
