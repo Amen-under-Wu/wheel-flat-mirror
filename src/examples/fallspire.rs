@@ -9,7 +9,7 @@ use rand::Rng;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type Float = f64;
+type Float = f32;
 
 fn round(v: Float, d: Option<Float>) -> Float {
     let m = (10.0 as Float).powf(d.unwrap_or(0.0));
@@ -1376,8 +1376,9 @@ impl FallSpireScene for SceneFlight {
         for i in (horizon + 10).clamp(0, 136)..=136 {
             let z = -Self::SF * (-200.0 + camera_y * 0.2) / (i as Float - horizon_f);
             let ty = camera_z * 0.5 + z;
-            let u = t as Float * 0.2 + (120 + (((ty as i32 / 32) * 3) % 8) * 240) as Float;
-            let v = 123.0 * 8.0 + ty % 32.0;
+            let u = t as Float * 0.2
+                + (120 + (((((ty / 32.0).floor() as i32) * 3) % 8 + 8) % 8) * 240) as Float;
+            let v = 123.0 * 8.0 + (ty % 32.0 + 32.0) % 32.0;
             core.cart.borrow_mut().textri(
                 0.0,
                 i as f32,
@@ -1416,13 +1417,13 @@ impl FallSpireScene for SceneFlight {
         let core = &self.core.borrow().gcore;
         core.palette_index(&[]);
         let horizon = core.camera.ytilt;
-        for i in (horizon as i32 + 10).max(0)..136 {
+        for i in (horizon as i32 + 10).max(0)..=136 {
             let z = -Self::SF * core.camera.y / (i as Float - horizon);
             let ty = -core.camera.z - z;
             let u = ty * 0.2
                 + (ty * 0.01).sin() * 50.0
-                + (120 + (((ty / 32.0) as i32 * 3) % 8) * 240) as Float;
-            let v = 119.0 * 8.8 + ty % 32.0;
+                + (120 + ((((ty / 32.0).floor() as i32 * 3) % 8 + 8) % 8) * 240) as Float;
+            let v = 119.0 * 8.0 + (ty % 32.0 + 32.0) % 32.0;
             core.cart.borrow_mut().textri(
                 0.0,
                 i as f32,
@@ -1929,7 +1930,7 @@ impl FallSpireScene for SceneTowerTop2 {
 struct SceneTowerCollapse {
     core: Rc<RefCell<FallSpireCore>>,
     t: i32,
-    plants: Vec<(i32, i32, i32)>,
+    plants: Vec<(Float, Float, Float)>,
 }
 impl SceneTowerCollapse {
     const COLOR_CHANGE_TIME: i32 = 300;
@@ -1942,7 +1943,11 @@ impl SceneTowerCollapse {
     }
     fn plant(&mut self) {
         let rng = &mut self.core.borrow_mut().rng;
-        let coord = (rng.gen_range(0..=240), rng.gen_range(104..=128), 0);
+        let coord = (
+            rng.gen_range(0..=240) as Float,
+            rng.gen_range(104..=128) as Float,
+            0.0,
+        );
         self.plants.push(coord);
     }
 }
@@ -2047,7 +2052,7 @@ impl FallSpireScene for SceneTowerCollapse {
                 pl.1 as f32,
                 5,
             );
-            pl.2 = 16.min(pl.2 + pl.1 / 10000);
+            pl.2 = (pl.2 + pl.1 * 0.0001).min(16.0);
         }
         {
             let core = &self.core.borrow().gcore;
