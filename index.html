@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三十辐共一毂</title>
+    <title>WheelFlat - 轮扁</title>
     <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
     <style>
         body {
@@ -44,8 +44,7 @@
             <br>
             <canvas id="canvas" tabindex="1"></canvas>
             <div class="info">
-                <p>在终端按键输入英文命令，按退格键删除，按回车键执行。</p>
-                <p>在终端输入save下载文件（二进制），输入upload [filename] 读取文件作为终端内名为[filename]的程序。</p>
+                <p id="quote"></p>
             </div>
             <br>
         </div>
@@ -55,6 +54,17 @@
     <script type="module" src="main.js"></script>
     <script type="module" src="audio_player.js"></script>
     <script>
+        let quotes = [
+            "浮名浮利何济，堪留恋处，轮回仓猝。",
+            "祸福回还车转毂，荣枯反覆手藏钩。",
+            "焚轮谓之颓，扶摇谓之猋。",
+            "三十辐共一毂，当其无，有车之用。",
+            "坎坎伐轮兮，寘之河之漘兮，河水清且沦猗。",
+            "是时唯闻鸟雀闹，尽日不听车轮哗。",
+            "春来芳草踏成蹊，半是车轮半马蹄。",
+            "天地车轮，终则复始，极则复反，莫不咸当。",
+            "轮人为轮，斩三材必以其时。",
+        ];
         async function init_player() {
             await DynamicWaveformPlayer.init();
             await DynamicWaveformPlayer.play();
@@ -63,12 +73,13 @@
             DynamicWaveformPlayer.appendWaveform(waveform);
         }
         window.onload = function() {
+            document.getElementById('quote').innerText = quotes[Math.floor(Math.random()*quotes.length)];
             let cover_title = document.getElementById('cover-title');
             cover_title.innerText = '点击开始';
             let cover = document.getElementById('cover');
             cover.style.cursor = 'pointer';
             cover.onclick = async function() {
-                cover_title.innerText = '请稍候……';
+                cover_title.innerText = '请稍候……（建议刷新重试）';
                 await init_player();
                 while (!try_init()) {}
                 let cover = document.getElementById('cover');
