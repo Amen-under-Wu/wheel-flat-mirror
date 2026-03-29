@@ -50,6 +50,12 @@ impl Vram {
     pub fn set_active_bank(&mut self, bank: usize) {
         self.active_vbank = bank;
     }
+    #[inline(always)]
+    pub unsafe fn get_unchecked(&self, idx: usize) -> u8 {
+        unsafe {
+            *self.vbanks.get_unchecked(self.active_vbank).get_unchecked(idx)
+        }
+    }
 }
 
 impl std::ops::Index<usize> for Vram {

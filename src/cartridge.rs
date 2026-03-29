@@ -155,9 +155,11 @@ impl CartContext {
 
     // graphics
 
-    #[inline]
+    #[inline(always)]
     fn map_color(&self, color: u8) -> u8 {
-        (self.ram.vram[Vram::PALETTE_MAP_OFFSET + color as usize / 2] >> ((color & 1) << 2)) & 0xf
+        unsafe {
+            (self.ram.vram.get_unchecked(Vram::PALETTE_MAP_OFFSET + color as usize / 2) >> ((color & 1) << 2)) & 0xf
+        }
     }
     #[inline]
     fn in_clip(&self, x: i32, y: i32) -> bool {
