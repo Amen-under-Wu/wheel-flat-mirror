@@ -1374,7 +1374,7 @@ impl FallSpireScene for SceneFlight {
         }
         core.palette_index(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 7, 7, 13, 14, 7]);
         for i in (horizon + 10).clamp(0, 136)..=136 {
-            let z = -Self::SF * (-200.0 + camera_y * 0.2) / (i as Float - horizon_f);
+            let z = Self::SF * (200.0 + camera_y * 0.2) / (i as Float - horizon_f);
             let ty = camera_z * 0.5 + z;
             let u = t as Float * 0.2
                 + (120 + (((((ty / 32.0).floor() as i32) * 3) % 8 + 8) % 8) * 240) as Float;
@@ -1418,7 +1418,7 @@ impl FallSpireScene for SceneFlight {
         core.palette_index(&[]);
         let horizon = core.camera.ytilt;
         for i in (horizon as i32 + 10).max(0)..=136 {
-            let z = -Self::SF * core.camera.y / (i as Float - horizon);
+            let z = Self::SF * core.camera.y / (i as Float - horizon);
             let ty = -core.camera.z - z;
             let u = ty * 0.2
                 + (ty * 0.01).sin() * 50.0
@@ -1482,7 +1482,7 @@ impl FallSpireScene for SceneTowerBase {
                     (136.0 - cy * 2.0) as f32,
                     (170.0 - cx * 2.0) as f32,
                     (136.0 - cy * 2.0) as f32,
-                    3,
+                    4,
                 );
                 cart.tri(
                     (136.0 - cx) as f32,
@@ -1491,7 +1491,7 @@ impl FallSpireScene for SceneTowerBase {
                     (136.0 - cy * 2.0) as f32,
                     (170.0 - cx * 2.0) as f32,
                     (136.0 - cy * 2.0) as f32,
-                    3,
+                    4,
                 );
                 cart.tri(
                     (104.0 - cx) as f32,
@@ -1638,7 +1638,7 @@ fn tree_distance_field(x: i32, y: i32, z: i32) -> Float {
     smoothmin(smoothmin(dist1, dist2, Some(10.0)), dist3, Some(10.0))
 }
 fn in_trunk(x: i32, y: i32, z: i32) -> bool {
-    x * x + z * z + y < 160
+    x * x + z * z + y <= 160
 }
 
 struct TreeUnit {
@@ -1669,7 +1669,7 @@ fn model_tree() -> Vec<TreeUnit> {
         }
     }
     for x in (-60..=60).step_by(res) {
-        for y in (-45..=0).step_by(5) {
+        for y in (-60..=60).step_by(res) {
             for z in (-60..=60).step_by(res) {
                 let xx = x + rng.gen_range(-5..=5);
                 let yy = y + rng.gen_range(-5..=5);
