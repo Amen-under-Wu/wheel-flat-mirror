@@ -88,7 +88,9 @@
         }
         function try_init() {
             try {
-                buttonCallback();
+                const searchParams = new URLSearchParams(window.location.search);
+                const cmd = searchParams.get("cmd");
+                buttonCallback(cmd || "");
                 return true;
             }
             catch (err) {

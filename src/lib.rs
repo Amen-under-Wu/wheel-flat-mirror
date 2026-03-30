@@ -162,9 +162,10 @@ struct Wheel {
 
 #[wasm_bindgen]
 impl Wheel {
-    pub fn new() -> Self {
+    pub fn new(cmd: &str) -> Self {
         let context = WheelContext::new();
-        let program = Box::new(wrapper::WheelWrapper::new_with_command("fallspire"));
+        let program = 
+            Box::new(if cmd.is_empty() {wrapper::WheelWrapper::new()} else {wrapper::WheelWrapper::new_with_command(cmd)});
         Self { context, program }
     }
     pub fn update(&mut self) {

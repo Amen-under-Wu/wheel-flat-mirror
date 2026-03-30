@@ -27,9 +27,9 @@ export function start_loop(test_func) {
 
 window.start_loop = start_loop;
 
-export function main() {
+export function main(cmd) {
     document.querySelector("canvas").focus();
-    const wheel = Wheel.new();
+    const wheel = Wheel.new(cmd);
     window.wheel = wheel;
     window.onresize = function() {
         let w = document.getElementById("container").clientWidth;
