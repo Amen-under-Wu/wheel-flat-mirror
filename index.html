@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WheelFlat - 轮扁</title>
     <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
         body {
-            margin: 0;
-            padding: 20px;
             background-color: #f0f0f0;
+            font-family: "Lato", sans-serif;
         }
         canvas {
             border: 1px solid #333;
@@ -28,15 +29,40 @@
             background-color: #f0f0f0;
             color: black;
             display: block;
-            z-index: 9999;
+            z-index: 99;
             display: flex;
             align-items: center
+        }
+        #navbar {
+            display: none;
+            z-index: 999;
         }
     </style>
 </head>
 <body>
     <div class="cover" id="cover">
         <h1 id="cover-title" style="margin:auto">加载中……</h1>
+    </div>
+    <div id="navbar">
+        <div class="w3-top">
+            <div class="w3-bar w3-black w3-card">
+                <a class="w3-bar-item w3-button w3-padding-large w3-hide-medium w3-hide-large w3-right"
+                   href="javascript:void(0)" onclick="myFunction()" title="Toggle Navigation Menu"><i
+                        class="fa fa-bars"></i></a>
+                <a href="/index.html" class="w3-bar-item w3-button w3-padding-large">AuW</a>
+                <a href="/cx/index.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small" target="_self">程序</a>
+                <a href="/sb/index.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small" target="_self">随笔</a>
+                <a href="/xf/index.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small" target="_self">想法</a>
+                <a href="/ll/index.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small" target="_self">联络</a>
+            </div>
+        </div>
+
+        <div id="navDemo" class="w3-bar-block w3-black w3-hide w3-hide-large w3-hide-medium w3-top" style="margin-top:46px">
+            <a href="/cx/index.html" class="w3-bar-item w3-button w3-padding-large" onclick="myFunction()">程序</a>
+            <a href="/sb/index.html" class="w3-bar-item w3-button w3-padding-large" onclick="myFunction()">随笔</a>
+            <a href="/xf/index.html" class="w3-bar-item w3-button w3-padding-large" onclick="myFunction()">想法</a>
+            <a href="/ll/index.html" class="w3-bar-item w3-button w3-padding-large" onclick="myFunction()">联络</a>
+        </div>
     </div>
     <div class="w3-content" style="max-width:2000px; margin-top:46px">
         <div id="container" class="w3-container w3-content w3-center w3-padding-32" style="max-width:800px">
@@ -53,7 +79,13 @@
     
     <script type="module" src="main.js"></script>
     <script type="module" src="audio_player.js"></script>
+    <script src="/bpk.js"></script>
     <script>
+        const searchParams = new URLSearchParams(window.location.search);
+        const navbar = searchParams.get("from");
+        if (navbar == "home") {
+            document.querySelector("#navbar").style.display = "block";
+        }
         let quotes = [
             "浮名浮利何济，堪留恋处，轮回仓猝。",
             "祸福回还车转毂，荣枯反覆手藏钩。",
@@ -88,7 +120,6 @@
         }
         function try_init() {
             try {
-                const searchParams = new URLSearchParams(window.location.search);
                 const cmd = searchParams.get("cmd");
                 buttonCallback(cmd || "");
                 return true;
