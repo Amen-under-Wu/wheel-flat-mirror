@@ -209,18 +209,13 @@ impl CartContext {
             255
         }
     }
+    #[inline]
     pub fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u8) {
         let color = self.map_color(color);
-        /*let w = w.min(self.clip_rect.0 + self.clip_rect.2 - x);
-        let h = h.min(self.clip_rect.1 + self.clip_rect.3 - y);
-        let x = x.max(self.clip_rect.0);
-        let y = y.max(self.clip_rect.1);*/
-        for yy in y..y + h {
-            for xx in x..x + w {
-                /*self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
-                self.get_subpix_map_mut().del(xx as usize, yy as usize);*/
-                // screw the performance
-                self.set_pix_direct(xx, yy, color);
+        for yy in y.max(self.clip_rect.1)..(y + h).min(self.clip_rect.1 + self.clip_rect.3) {
+            for xx in x.max(self.clip_rect.0)..(x + w).min(self.clip_rect.0 + self.clip_rect.2) {
+                self.poke4(yy as usize * Vram::SCREEN_WIDTH + xx as usize, color);
+                self.get_subpix_map_mut().del(xx as usize, yy as usize);
             }
         }
     }
@@ -1284,9 +1279,11 @@ impl CartContext {
             let vol_frame = self.peek(sfx_state_offset) as usize;
             // doc says volume is inverted
             let frame_vol = 15 - self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * vol_frame) & 0xf;
-            let volume = reg.volume.min(1)
+            /*let volume = reg.volume.min(1)
                 * frame_vol.min(1)
-                * (frame_vol + reg.volume).saturating_sub(15).max(1);
+                * (frame_vol + reg.volume).saturating_sub(15).max(1);*/
+            let volume = reg.volume.min(1) * frame_vol.min(1)*(frame_vol * reg.volume / 15).max(1);
+
 
             let arp_frame = self.peek(sfx_state_offset + 2) as usize;
             let arp = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * arp_frame + 1) & 0xf;
