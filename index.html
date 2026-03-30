@@ -111,11 +111,14 @@
             let cover = document.getElementById('cover');
             cover.style.cursor = 'pointer';
             cover.onclick = async function() {
-                cover_title.innerText = '请稍候……（建议刷新重试）';
                 await init_player();
-                while (!try_init()) {}
-                let cover = document.getElementById('cover');
-                cover.style.display = 'none';
+                if (!try_init()) {
+                    cover_title.innerText = '请刷新重试';
+                }
+                else {
+                    let cover = document.getElementById('cover');
+                    cover.style.display = 'none';
+                }
             }
         }
         function try_init() {
