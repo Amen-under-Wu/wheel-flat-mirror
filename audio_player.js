@@ -39,11 +39,11 @@ const DynamicWaveformPlayer = (function() {
                 const outputChannel = output[0];
                 
                 if (this.waveformBuffer.length === 0 || this.currentPosition >= this.waveformBuffer.length) {
-                    outputChannel.fill(0);
+                    //outputChannel.fill(0);
                     return true;
                 }
                 
-                this.bufferLock = true;
+                //this.bufferLock = true;
                 
                 const samplesToCopy = Math.min(
                     outputChannel.length,
@@ -59,6 +59,12 @@ const DynamicWaveformPlayer = (function() {
                 }
                 
                 this.currentPosition += samplesToCopy;
+
+                const maxLen = 50000
+                if (this.currentPosition >= maxLen) {
+                    this.waveformBuffer = this.waveformBuffer.slice(maxLen);
+                    this.currentPosition -= maxLen;
+                }
                 
                 return true;
             }
