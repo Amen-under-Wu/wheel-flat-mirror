@@ -887,13 +887,10 @@ impl GraphicsCore {
     }
     fn cloud_repeat(&self, x: i32, y: i32) {
         let mut cart = self.cart.borrow_mut();
-        cart.map(60, 34, 30, 17, x % 240, y % 136, 6, 1);
-        cart.map(60, 34, 30, 17, x % 240 - 240, y % 136, 6, 1);
-        cart.map(60, 34, 30, 17, x % 240, y % 136 - 136, 6, 1);
-        cart.map(60, 34, 30, 17, x % 240 - 240, y % 136 - 136, 6, 1);
-        cart.map(60, 34, 30, 17, x % 240 + 240, y % 136, 6, 1);
-        cart.map(60, 34, 30, 17, x % 240, y % 136 + 136, 6, 1);
-        cart.map(60, 34, 30, 17, x % 240 + 240, y % 136 + 136, 6, 1);
+        cart.map(60, 34, 30, 17, x.rem_euclid(240), y.rem_euclid(136), 6, 1);
+        cart.map(60, 34, 30, 17, x.rem_euclid(240) - 240, y.rem_euclid(136), 6, 1);
+        cart.map(60, 34, 30, 17, x.rem_euclid(240), y.rem_euclid(136) - 136, 6, 1);
+        cart.map(60, 34, 30, 17, x.rem_euclid(240) - 240, y.rem_euclid(136) - 136, 6, 1);
     }
     fn tower_top(&self, x: i32, y: i32) {
         self.cart.borrow_mut().map(92, 1, 4, 30, x, y, 6, 1);
