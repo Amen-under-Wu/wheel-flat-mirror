@@ -53,7 +53,10 @@ impl Vram {
     #[inline(always)]
     pub unsafe fn get_unchecked(&self, idx: usize) -> u8 {
         unsafe {
-            *self.vbanks.get_unchecked(self.active_vbank).get_unchecked(idx)
+            *self
+                .vbanks
+                .get_unchecked(self.active_vbank)
+                .get_unchecked(idx)
         }
     }
 }

@@ -158,7 +158,12 @@ impl CartContext {
     #[inline(always)]
     fn map_color(&self, color: u8) -> u8 {
         unsafe {
-            (self.ram.vram.get_unchecked(Vram::PALETTE_MAP_OFFSET + color as usize / 2) >> ((color & 1) << 2)) & 0xf
+            (self
+                .ram
+                .vram
+                .get_unchecked(Vram::PALETTE_MAP_OFFSET + color as usize / 2)
+                >> ((color & 1) << 2))
+                & 0xf
         }
     }
     #[inline]
@@ -1280,10 +1285,10 @@ impl CartContext {
             // doc says volume is inverted
             let frame_vol = 15 - self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * vol_frame) & 0xf;
             /*let volume = reg.volume.min(1)
-                * frame_vol.min(1)
-                * (frame_vol + reg.volume).saturating_sub(15).max(1);*/
-            let volume = reg.volume.min(1) * frame_vol.min(1)*(frame_vol * reg.volume / 15).max(1);
-
+             * frame_vol.min(1)
+             * (frame_vol + reg.volume).saturating_sub(15).max(1);*/
+            let volume =
+                reg.volume.min(1) * frame_vol.min(1) * (frame_vol * reg.volume / 15).max(1);
 
             let arp_frame = self.peek(sfx_state_offset + 2) as usize;
             let arp = self.peek(sfx_offset + Ram::SFX_FRAME_BYTE_SIZE * arp_frame + 1) & 0xf;

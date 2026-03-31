@@ -40,8 +40,8 @@ fn parse_command(input: &str) -> Command {
 enum WrapperState {
     Idle,
     Running(Box<dyn InternalProgram>),
-    Editing,
-    Menu,
+    //Editing,
+    //Menu,
 }
 
 pub struct WheelWrapper {

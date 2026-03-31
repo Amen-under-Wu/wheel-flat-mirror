@@ -164,8 +164,11 @@ struct Wheel {
 impl Wheel {
     pub fn new(cmd: &str) -> Self {
         let context = WheelContext::new();
-        let program = 
-            Box::new(if cmd.is_empty() {wrapper::WheelWrapper::new()} else {wrapper::WheelWrapper::new_with_command(cmd)});
+        let program = Box::new(if cmd.is_empty() {
+            wrapper::WheelWrapper::new()
+        } else {
+            wrapper::WheelWrapper::new_with_command(cmd)
+        });
         Self { context, program }
     }
     pub fn update(&mut self) {
