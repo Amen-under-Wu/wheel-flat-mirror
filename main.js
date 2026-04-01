@@ -5,13 +5,24 @@ init().then(() => {
 
 let fps_timer = performance.now();
 let fps = 0;
+let fps_flag = true;
+let upf = 1;
 
 function startAnimationLoop(step) {
+    fps_timer = performance.now();
     function frame() {
         const now = performance.now();
-        step();
+        for (let i = 0; i < upf; ++i) {
+            step();
+        }
         fps++;
         if (now - fps_timer >= 1000) {
+            if (fps_flag) {
+                if (fps < 40) {
+                    upf = 2; // assume the device runs on 30fps
+                }
+                fps_flag = false;
+            }
             console.log(fps);
             fps_timer = now;
             fps = 0;
