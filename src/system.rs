@@ -7,6 +7,7 @@ pub struct SystemContext {
     pub top_line: usize,
     pub program_timer: u64,
     pub exit_flag: bool,
+    pub reset_flag: bool,
     pub capslock: bool,
 }
 
@@ -22,6 +23,7 @@ impl SystemContext {
             cursor_pos: 0,
             top_line: 0,
             program_timer: Date::now() as u64,
+            reset_flag: false,
             exit_flag: false,
             capslock: false,
         }
@@ -70,7 +72,9 @@ impl SystemContext {
             .extend(new_lines.into_iter().map(|line| (line.clone(), color)));
     }
 
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        self.reset_flag = true;
+    }
     pub fn time(&self) -> u64 {
         Date::now() as u64 - self.program_timer
     }

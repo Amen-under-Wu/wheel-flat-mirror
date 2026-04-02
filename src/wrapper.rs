@@ -124,6 +124,14 @@ impl WheelWrapper {
     fn self_update(&mut self) {
         if let WrapperState::Running(program) = &mut self.state {
             program.update();
+            let reset = self.system.borrow().reset_flag;
+            if reset {
+                self.system.borrow_mut().reset_flag = false;
+                self.cart.borrow_mut().reset();
+                self.system.borrow_mut().program_timer = Date::now() as u64;
+                program.init(self.cart.clone(), self.system.clone());
+                return;
+            }
             let exit_flag = self.system.borrow().exit_flag;
             if exit_flag {
                 if let Some(bytes) = program.to_file() {
@@ -139,6 +147,7 @@ impl WheelWrapper {
                     .set_file_ptr(Rc::new(RefCell::new(WheelFile::new_default())));
                 self.cart.borrow_mut().sync(255, 0, false);
                 self.system.borrow_mut().exit_flag = false;
+                self.cart.borrow_mut().reset();
             }
             return;
         }

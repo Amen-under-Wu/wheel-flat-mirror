@@ -36,7 +36,7 @@ pub struct CartContext {
     clip_rect: (i32, i32, i32, i32),
     pub key_timer: HashMap<u8, u32>,
     pub btn_timer: [i32; 32],
-    pub sfx_reg: [SfxRegister; 4],
+    sfx_reg: [SfxRegister; 4],
     ch_font: (Vec<u8>, Vec<u8>),
     pub file_data: Rc<RefCell<WheelFile>>,
 }
@@ -53,6 +53,11 @@ impl CartContext {
             ch_font: crate::data::ch_font(),
             file_data: Rc::new(RefCell::new(WheelFile::new())),
         }
+    }
+    pub fn reset(&mut self) {
+        self.ram = Ram::new();
+        self.clip_rect = (0, 0, Vram::SCREEN_WIDTH as i32, Vram::SCREEN_HEIGHT as i32);
+        self.sfx_reg = [SfxRegister::new(); 4];
     }
 
     pub fn get_subpix_map_mut(&mut self) -> &mut PixMask {
