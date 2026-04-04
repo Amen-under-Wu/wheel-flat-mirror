@@ -1,8 +1,6 @@
 use crate::cartridge::pix_mask::PixMask;
 
 pub struct Vram {
-    vbanks: [[u8; Self::SIZE]; Self::VBANK_N],
-    active_vbank: usize,
     subpixels: PixMask,
 }
 
@@ -30,105 +28,16 @@ impl Vram {
     pub const BLIT_SEGMENT_OFFSET: usize = Self::MOUSE_CURSOR_OFFSET + Self::MOUSE_CURSOR_BYTE_SIZE;
 
     pub fn new() -> Self {
-        let mut vbanks = [[0; Self::SIZE]; Self::VBANK_N];
-        let palette_default = crate::data::tic80_palette();
-        for i in 0..2 {
-            for j in 0..8 {
-                vbanks[i][Self::PALETTE_MAP_OFFSET + j] = (j * 2 + (j * 2 + 1) * 16) as u8;
-            }
-            for j in 0..48 {
-                vbanks[i][Self::PALETTE_OFFSET + j] = palette_default[j];
-            }
-            vbanks[i][Self::BLIT_SEGMENT_OFFSET] = 2;
-        }
         Self {
-            vbanks,
-            active_vbank: 0,
             subpixels: PixMask::new(Self::SCREEN_WIDTH * Self::SCREEN_HEIGHT),
         }
-    }
-    pub fn set_active_bank(&mut self, bank: usize) {
-        self.active_vbank = bank;
-    }
-    #[inline(always)]
-    pub unsafe fn get_unchecked(&self, idx: usize) -> u8 {
-        unsafe {
-            *self
-                .vbanks
-                .get_unchecked(self.active_vbank)
-                .get_unchecked(idx)
-        }
-    }
-}
-
-impl std::ops::Index<usize> for Vram {
-    type Output = u8;
-    fn index(&self, index: usize) -> &u8 {
-        &self.vbanks[self.active_vbank][index]
-    }
-}
-
-impl std::ops::IndexMut<usize> for Vram {
-    fn index_mut(&mut self, index: usize) -> &mut u8 {
-        &mut self.vbanks[self.active_vbank][index]
-    }
-}
-
-impl std::ops::Index<std::ops::Range<usize>> for Vram {
-    type Output = [u8];
-    fn index(&self, range: std::ops::Range<usize>) -> &[u8] {
-        &self.vbanks[self.active_vbank][range]
-    }
-}
-
-impl std::ops::IndexMut<std::ops::Range<usize>> for Vram {
-    fn index_mut(&mut self, range: std::ops::Range<usize>) -> &mut [u8] {
-        &mut self.vbanks[self.active_vbank][range]
-    }
-}
-
-impl std::ops::Index<std::ops::RangeFull> for Vram {
-    type Output = [u8];
-    fn index(&self, _: std::ops::RangeFull) -> &[u8] {
-        &self.vbanks[self.active_vbank][..]
-    }
-}
-
-impl std::ops::IndexMut<std::ops::RangeFull> for Vram {
-    fn index_mut(&mut self, _: std::ops::RangeFull) -> &mut [u8] {
-        &mut self.vbanks[self.active_vbank][..]
-    }
-}
-
-impl std::ops::Index<std::ops::RangeFrom<usize>> for Vram {
-    type Output = [u8];
-    fn index(&self, range: std::ops::RangeFrom<usize>) -> &[u8] {
-        &self.vbanks[self.active_vbank][range]
-    }
-}
-
-impl std::ops::IndexMut<std::ops::RangeFrom<usize>> for Vram {
-    fn index_mut(&mut self, range: std::ops::RangeFrom<usize>) -> &mut [u8] {
-        &mut self.vbanks[self.active_vbank][range]
-    }
-}
-
-impl std::ops::Index<std::ops::RangeTo<usize>> for Vram {
-    type Output = [u8];
-    fn index(&self, range: std::ops::RangeTo<usize>) -> &[u8] {
-        &self.vbanks[self.active_vbank][range]
-    }
-}
-
-impl std::ops::IndexMut<std::ops::RangeTo<usize>> for Vram {
-    fn index_mut(&mut self, range: std::ops::RangeTo<usize>) -> &mut [u8] {
-        &mut self.vbanks[self.active_vbank][range]
     }
 }
 
 pub struct Ram {
     pub vram: Vram,
-    pub ram: [u8; Self::SIZE - Vram::SIZE],
+    pub ram: [u8; Self::SIZE + Vram::SIZE],
+    pub active_vbank: usize,
 }
 
 impl Ram {
@@ -209,32 +118,51 @@ impl Ram {
     const GAMEPAD_MAPPING_BYTE_SIZE: usize = 32;
 
     pub fn new() -> Self {
-        let mut ram = [0; Self::SIZE - Vram::SIZE];
+        let mut ram = [0; Self::SIZE + Vram::SIZE];
+        let palette_default = crate::data::tic80_palette();
+        for i in 0..2 {
+            for j in 0..8 {
+                ram[i * Vram::SIZE + Vram::PALETTE_MAP_OFFSET + j] =
+                    (j * 2 + (j * 2 + 1) * 16) as u8;
+            }
+            for j in 0..48 {
+                ram[i * Vram::SIZE + Vram::PALETTE_OFFSET + j] = palette_default[j];
+            }
+            ram[i * Vram::SIZE + Vram::BLIT_SEGMENT_OFFSET] = 2;
+        }
         let font_data = crate::data::tic80_font();
         for i in 0..(font_data.0.len()) {
-            ram[Self::SYSTEM_FONT_OFFSET - Vram::SIZE + i] = font_data.0[i];
+            ram[Self::SYSTEM_FONT_OFFSET + Vram::SIZE + i] = font_data.0[i];
         }
         for i in 0..(font_data.1.len()) {
-            ram[Self::ALT_FONT_OFFSET - Vram::SIZE + i] = font_data.1[i];
+            ram[Self::ALT_FONT_OFFSET + Vram::SIZE + i] = font_data.1[i];
         }
         let key_map = crate::data::default_key_map();
         for i in 0..8 {
-            ram[Self::GAMEPAD_MAPPING_OFFSET - Vram::SIZE + i] = key_map[i];
+            ram[Self::GAMEPAD_MAPPING_OFFSET + Vram::SIZE + i] = key_map[i];
         }
         Self {
             vram: Vram::new(),
             ram,
+            active_vbank: 0,
         }
     }
     pub fn set_active_vbank(&mut self, id: usize) {
-        self.vram.set_active_bank(id);
+        self.active_vbank = id;
     }
     pub fn get_subpixels_mut(&mut self) -> &mut PixMask {
         &mut self.vram.subpixels
     }
     pub fn clear_overlay(&mut self) {
         for i in 0..Vram::SCREEN_BYTE_SIZE {
-            self.vram.vbanks[1][i] = 0;
+            self.ram[i] = 0;
+        }
+    }
+    pub unsafe fn get_unchecked(&self, index: usize) -> u8 {
+        unsafe {
+            *self.ram.get_unchecked(
+                Vram::SIZE + index - (index < Vram::SIZE) as usize * self.active_vbank * Vram::SIZE,
+            )
         }
     }
 }
@@ -242,58 +170,14 @@ impl Ram {
 impl std::ops::Index<usize> for Ram {
     type Output = u8;
     fn index(&self, index: usize) -> &u8 {
-        if index < Vram::SIZE {
-            &self.vram[index]
-        } else {
-            &self.ram[index - Vram::SIZE]
-        }
+        &self.ram
+            [Vram::SIZE + index - (index < Vram::SIZE) as usize * self.active_vbank * Vram::SIZE]
     }
 }
 
 impl std::ops::IndexMut<usize> for Ram {
     fn index_mut(&mut self, index: usize) -> &mut u8 {
-        if index < Vram::SIZE {
-            &mut self.vram[index]
-        } else {
-            &mut self.ram[index - Vram::SIZE]
-        }
-    }
-}
-
-impl std::ops::Index<std::ops::Range<usize>> for Ram {
-    type Output = [u8];
-
-    fn index(&self, range: std::ops::Range<usize>) -> &[u8] {
-        let start = range.start;
-        let end = range.end;
-
-        if end <= Vram::SIZE {
-            // 完全在 VRAM 中
-            &self.vram[start..end]
-        } else if start >= Vram::SIZE {
-            // 完全在 RAM 中
-            &self.ram[(start - Vram::SIZE)..(end - Vram::SIZE)]
-        } else {
-            // 跨边界的情况 - 不能直接返回连续 slice
-            panic!("Cannot create slice that spans VRAM and RAM boundaries");
-        }
-    }
-}
-
-impl std::ops::IndexMut<std::ops::Range<usize>> for Ram {
-    fn index_mut(&mut self, range: std::ops::Range<usize>) -> &mut [u8] {
-        let start = range.start;
-        let end = range.end;
-
-        if end <= Vram::SIZE {
-            // 完全在 VRAM 中
-            &mut self.vram[start..end]
-        } else if start >= Vram::SIZE {
-            // 完全在 RAM 中
-            &mut self.ram[(start - Vram::SIZE)..(end - Vram::SIZE)]
-        } else {
-            // 跨边界的情况
-            panic!("Cannot create mutable slice that spans VRAM and RAM boundaries");
-        }
+        &mut self.ram
+            [Vram::SIZE + index - (index < Vram::SIZE) as usize * self.active_vbank * Vram::SIZE]
     }
 }

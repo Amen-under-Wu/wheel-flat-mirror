@@ -165,7 +165,6 @@ impl CartContext {
         unsafe {
             (self
                 .ram
-                .vram
                 .get_unchecked(Vram::PALETTE_MAP_OFFSET + color as usize / 2)
                 >> ((color & 1) << 2))
                 & 0xf
