@@ -1,18 +1,21 @@
-use crate::script::WheelScript;
 use crate::{
     cartridge::CartContext,
+    script::WheelScript,
     system::SystemContext,
     wheel_file::{Chunk, ChunkType, Savable, WheelFile},
 };
 use js_sys::{Function, Reflect};
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 use wasm_bindgen::prelude::*;
 
 pub struct JsScript {
     data: Rc<RefCell<WheelFile>>,
     script: String,
-    system: Option<Rc<RefCell<SystemContext>>>,
-    cart: Option<Rc<RefCell<CartContext>>>,
+    system: Weak<RefCell<SystemContext>>,
+    cart: Weak<RefCell<CartContext>>,
 }
 
 impl JsScript {
@@ -30,8 +33,8 @@ impl JsScript {
         Self {
             data: Rc::new(RefCell::new(WheelFile::new())),
             script: String::new(),
-            system: None,
-            cart: None,
+            system: Weak::new(),
+            cart: Weak::new(),
         }
     }
 }
@@ -66,8 +69,8 @@ impl Savable for JsScript {
 
 impl WheelScript for JsScript {
     fn bind(&mut self, cart: Rc<RefCell<CartContext>>, system: Rc<RefCell<SystemContext>>) {
-        self.system = Some(system.clone());
-        self.cart = Some(cart.clone());
+        self.system = Rc::downgrade(&system);
+        self.cart = Rc::downgrade(&cart);
         cart.borrow_mut().set_file_ptr(self.data.clone());
         cart.borrow_mut().sync(255, 0, false);
 
@@ -598,8 +601,12 @@ impl WheelScript for JsScript {
     }
     fn log_error(&mut self, message: &str) {
         web_sys::console::error_1(&message.into());
-        self.system.as_ref().unwrap().borrow_mut().trace(message, 2);
-        self.system.as_ref().unwrap().borrow_mut().exit();
+        self.system
+            .upgrade()
+            .unwrap()
+            .borrow_mut()
+            .trace(message, 2);
+        self.system.upgrade().unwrap().borrow_mut().exit();
     }
     fn save(&self) -> Option<Vec<u8>> {
         Some(<JsScript as Savable>::save(self).to_bytes())
