@@ -41,7 +41,11 @@
 </head>
 <body>
     <div class="cover" id="cover">
-        <h1 id="cover-title" style="margin:auto">加载中……</h1>
+        <div style="margin:auto">
+            <h1 id="cover-title" style="margin:auto">加载中……</h1>
+            <br>
+            <progress style="margin:auto" id="progress" value="0" max="100"></progress>
+        </div>
     </div>
     <div id="navbar">
         <div class="w3-top">
@@ -81,6 +85,34 @@
     <script type="module" src="audio_player.js"></script>
     <script src="/bpk.js"></script>
     <script>
+        const observer = new PerformanceObserver((list) => {
+            const entries = list.getEntries();
+            let totalBytes = 0;
+            let loadedBytes = 0;
+            for (const entry of entries) {
+                totalBytes += entry.transferSize;
+                loadedBytes += entry.encodedBodySize || entry.decodedBodySize;
+            }
+            const progress = loadedBytes / totalBytes * 100;
+            const progressBar = document.getElementById('progress');
+            if (progressBar) {
+                progressBar.value = progress;
+            }
+        });
+        observer.observe({ entryTypes: ['resource'] });
+        const resources = window.performance.getEntriesByType('resource');
+        let totalBytes = 0;
+        let loadedBytes = 0;
+        for (const resource of resources) {
+            totalBytes += resource.transferSize;
+            loadedBytes += resource.encodedBodySize || resource.decodedBodySize;
+        }
+        const progress = loadedBytes / totalBytes * 100;
+        const progressBar = document.getElementById('progress');
+        if (progressBar) {
+            progressBar.value = progress;
+        }
+
         const searchParams = new URLSearchParams(window.location.search);
         const navbar = searchParams.get("from");
         if (navbar == "home") {
@@ -116,7 +148,7 @@
         function append_wave(waveform) {
             DynamicWaveformPlayer.appendWaveform(waveform);
         }
-        window.onload = function() {
+        function loaded_callback() {
             document.getElementById('quote').innerText = quotes[Math.floor(Math.random()*quotes.length)];
             let cover_title = document.getElementById('cover-title');
             cover_title.innerText = '点击开始';
@@ -143,6 +175,11 @@
                 return false;
             }
         }
+        document.onreadystatechange = () => {
+            if (document.readyState === "complete") {
+                loaded_callback();
+            }
+        };
     </script>
 </body>
 </html>
